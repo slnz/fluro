@@ -37,7 +37,7 @@ export function mapParameters(parameters) {
         set.push(encodeURIComponent(k) + '=' + encodeURIComponent(v))
       }
       return set
-    }, [])
+    }, [] as string[])
     .compact()
     .value()
     .join('&')
@@ -449,8 +449,7 @@ export function comma(array, path, limit) {
  * Returns a specified _id for an object
  * @alias utils.getStringID
  * @param  {Object} input      An object that is or has an _id property
- * @param  {Boolean} asObjectID Whether to convert to a Mongo ObjectId
- * @return {String}            Will return either a string or a Mongo ObjectId
+ * @return {String}            Will return a string
  *
  * @example
  *
@@ -459,62 +458,16 @@ export function comma(array, path, limit) {
  *
  * // Returns true
  * typeof FluroUtils.getStringID({_id:'5cb3d8b3a2219970e6f86927', title, ...}) === 'string';
- * // Returns true
- * typeof FluroUtils.getStringID({_id:'5cb3d8b3a2219970e6f86927'}, true) === 'object';
  */
-export function getStringID(input, asObjectID?) {
-  if (!input) {
-    return input
-  }
+export function getStringID(
+  input: string | { _id: unknown } | undefined
+): string | undefined {
+  if (input == null) return input
 
-  let output
-  if (input._id) {
-    output = String(input._id)
-  } else {
-    output = String(input)
-  }
-  if (!asObjectID || isBrowser) {
-    return output
-  }
-  return output
-  // // Load mongoose if we can
-  // try {
-  //     let mongoose = require('mongoose');
-  // } catch(e) {
-  //     console.log('ERROR', e);
-  //     return output;
-  // }
-  //   // let ObjectId = mongoose.Types.ObjectId;
-  // let isValid = ObjectId.isValid(String(output));
-  // if (!isValid) {
-  //     return;
-  // }
-  // return new ObjectId(output);
+  if (typeof input === 'object' && input._id) return String(input._id)
+
+  return String(input)
 }
-// distance(point1, point2, unit) {
-//                 let lat1 = point1.lat;
-//                 let lon1 = point1.lon;
-//                 let lat2 = point2.lat;
-//                 let lon2 = point2.lon;
-//                 if ((lat1 === lat2) && (lon1 === lon2)) {
-//                     return 0;
-//                 } else {
-//                     let radlat1 = Math.PI * lat1 / 180;
-//                     let radlat2 = Math.PI * lat2 / 180;
-//                     let theta = lon1 - lon2;
-//                     let radtheta = Math.PI * theta / 180;
-//                     let dist = Math.sin(radlat1) * Math.sin(radlat2) + Math.cos(radlat1) * Math.cos(radlat2) * Math.cos(radtheta);
-//                     if (dist > 1) {
-//                         dist = 1;
-//                     }
-//                     dist = Math.acos(dist);
-//                     dist = dist * 180 / Math.PI;
-//                     dist = dist * 60 * 1.1515;
-//                     if (unit === "K") { dist = dist * 1.609344 }
-//                     if (unit === "N") { dist = dist * 0.8684 }
-//                     return dist;
-//                 }
-//             }
 /**
  * Cleans and maps an array of objects to an array of IDs
  * @alias utils.arrayIDs
@@ -526,14 +479,14 @@ export function getStringID(input, asObjectID?) {
  * // Returns ['5cb3d8b3a2219970e6f86927', '5cb3d8b3a2219970e6f86927', '5cb3d8b3a2219970e6f86927']
  * fluro.utils.arrayIDs([{_id:'5cb3d8b3a2219970e6f86927'}, {_id:'5cb3d8b3a2219970e6f86927'}, null, '5cb3d8b3a2219970e6f86927'])
  */
-export function arrayIDs(array, asObjectID?): string[] {
+export function arrayIDs(array): string[] {
   if (!array) {
     return []
   }
   return chain(array)
     .compact()
     .map((input) => {
-      return FluroUtils.getStringID(input, asObjectID)
+      return FluroUtils.getStringID(input)
     })
     .compact()
     .uniq()
@@ -713,6 +666,20 @@ export function injectModule(scriptURL, options) {
   inflightPromises[scriptURL] = promise
   return promise
 }
+
+interface Field {
+  asObject: boolean
+  directive: string
+  key: string
+  title: string
+  trail: string[]
+  titles: string[]
+  maximum: number
+  minimum: number
+  fields?: []
+  type: string
+}
+
 /**
  * Helper function for getting a flattened list of all nested fields
  * defined for a definition in Fluro
@@ -722,18 +689,16 @@ export function injectModule(scriptURL, options) {
  * @param  {Array} trail An array to append titles to (required)
  * @return {Array}     A flattened list of all fields with their nested trails and titles
  */
-export function getFlattenedFields(array, trail, titles) {
-  if (!trail) {
-    trail = []
-  }
-  if (!titles) {
-    titles = []
-  }
+export function getFlattenedFields(
+  array: Field[],
+  trail: string[] = [],
+  titles: string[] = []
+) {
   return chain(array)
     .map((inputField) => {
       // Create a new object so we don't mutate
       const field = Object.assign({}, inputField)
-      const returnValue = []
+      const returnValue: (Field | Field[])[] = []
       // If there are sub fields
       if (field.fields && field.fields.length) {
         if (field.asObject || field.directive === 'embedded') {
@@ -759,11 +724,7 @@ export function getFlattenedFields(array, trail, titles) {
             titles.push(field.title)
           }
         }
-        const fields = FluroUtils.getFlattenedFields(
-          field.fields,
-          trail,
-          titles
-        )
+        const fields = getFlattenedFields(field.fields, trail, titles)
         if (field.asObject || field.directive === 'embedded') {
           trail.pop()
           titles.pop()

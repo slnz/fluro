@@ -1,6 +1,19 @@
 import { chain, each, includes, startCase, map, orderBy } from 'lodash'
 
 import type FluroCore from './fluro.core'
+
+export interface Type {
+  definitionName: string
+  parentType?: string
+  plural: string
+  title: string
+  status: string
+}
+
+interface Glossary {
+  [key: string]: Type
+}
+
 /**
  * Creates a new FluroTypes service
  * This module provides a number of helpful functions for retrieving, translating and understanding types, schemas and definitions
@@ -11,15 +24,9 @@ import type FluroCore from './fluro.core'
  * @param {FluroCore} fluro A reference to the parent instance of the FluroCore module. This module is usually created by a FluroCore instance that passes itself in as the first argument.
  */
 export default class FluroTypes {
-  glossary: {
-    [key: string]: {
-      definitionName: string
-      parentType?: string
-      plural: string
-    }
-  } = {}
+  glossary: Glossary = {}
 
-  inflightTermsRequest
+  inflightTermsRequest?: Promise<Glossary>
 
   constructor(private core: FluroCore) {}
 
@@ -232,36 +239,31 @@ export default class FluroTypes {
    * fluro.types.mapDefinitionItems([{title:'test', definition:'demographic'}], 'tag');
    *
    */
-  mapDefinitionItems(array, backup) {
+  mapDefinitionItems(array: { definition?: string }[], backup) {
     if (!array || !array.length) {
       return []
     }
 
-    return (
-      chain(array)
-        // .orderBy(function(item) {
-        //     return String(item.title).toLowerCase()
-        // })
-        .reduce((set, entry) => {
-          const key = entry.definition || backup
-          let existing = set[key]
-          if (!existing) {
-            existing = set[key] = {
-              title: this.readable(key, false),
-              plural: this.readable(key, true),
-              key,
-              entries: []
-            }
+    return chain(array)
+      .reduce((set, entry) => {
+        const key = entry.definition || backup
+        let existing = set[key]
+        if (!existing) {
+          existing = set[key] = {
+            title: this.readable(key, false),
+            plural: this.readable(key, true),
+            key,
+            entries: []
           }
-          existing.entries.push(entry)
-          return set
-        }, {})
-        .values()
-        .orderBy((type) => {
-          return type.key === backup
-        })
-        .value()
-    )
+        }
+        existing.entries.push(entry)
+        return set
+      }, {})
+      .values()
+      .orderBy((type) => {
+        return type.key === backup
+      })
+      .value()
   }
 
   /**
@@ -311,14 +313,16 @@ export default class FluroTypes {
       options.cache = false
 
       this.glossary = {}
-      return this.core.api.get(`/defined/terms`, options).then((res) => {
-        each(res.data, (entry, key) => {
-          entry.definitionName = key
-        })
+      return this.core.api
+        .get<Glossary>(`/defined/terms`, options)
+        .then((res) => {
+          each(res.data, (entry, key) => {
+            entry.definitionName = key
+          })
 
-        this.glossary = res.data
-        return resolve(res.data)
-      }, reject)
+          this.glossary = res.data
+          return resolve(res.data)
+        }, reject)
     })
 
     return this.inflightTermsRequest
@@ -476,7 +480,7 @@ export default class FluroTypes {
           set.push(term)
         }
         return set
-      }, [])
+      }, [] as Type[])
       .orderBy((definition) => {
         return definition.title
       })

@@ -1,4 +1,4 @@
-import { get, map, slice } from 'lodash'
+import { get, map, reduce, slice } from 'lodash'
 
 import type FluroCore from '../api/fluro.core'
 import FluroDispatcher from '../api/fluro.dispatcher'
@@ -110,10 +110,14 @@ export default class FluroContentListService {
         console.log('cumulative test', startingIndex, start, end)
         const listItems = slice(filtered, startingIndex, end)
         // Create a fast hash
-        const pageItemLookup = listItems.reduce((set, item) => {
-          set[item._id] = item
-          return set
-        }, {})
+        const pageItemLookup: Record<string, unknown> = reduce(
+          listItems,
+          (set, item) => {
+            set[item._id] = item
+            return set
+          },
+          {}
+        )
         // Find the IDs we need to load
         let ids: string[] = []
         if (this._cumulative) {

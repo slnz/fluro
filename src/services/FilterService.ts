@@ -18,6 +18,8 @@ import {
 import moment from 'moment-timezone'
 import stringSimilarity from 'string-similarity'
 
+import { getFlattenedFields } from '../api/fluro.utils'
+
 let chrono //= require('chrono-node');
 let verboseDEBUG
 
@@ -34,7 +36,7 @@ export function activeFilters(config) {
     }
 
     if (block.filters && block.filters.length) {
-      each(block.filters, function (b) {
+      each(block.filters, (b) => {
         getActiveFilter(b, memo)
       })
     }
@@ -46,7 +48,7 @@ function isNotANumber(input) {
 }
 
 export function activeFilterRows() {
-  return filter(activeFilters, function (row) {
+  return filter(activeFilters, (row) => {
     return row.comparator && row.comparator.length
   })
 }
@@ -160,7 +162,7 @@ export function activeFilterComparators(config) {
     }
 
     if (block.filters && block.filters.length) {
-      each(block.filters, function (b) {
+      each(block.filters, (b) => {
         getActiveFilterComparator(b, memo)
       })
     }
@@ -201,7 +203,7 @@ export function activeFilterOperators(config) {
       trail.push(operator)
 
       // Check if any of it's filters are valid and active
-      const isValid = some(block.filters, function (filter) {
+      const isValid = some(block.filters, (filter) => {
         return isValidFilter(filter)
       })
 
@@ -214,7 +216,7 @@ export function activeFilterOperators(config) {
 
     // Go down the tree further
     if (block.filters && block.filters.length) {
-      each(block.filters, function (b) {
+      each(block.filters, (b) => {
         getActiveFilterBlockOperator(b, memo, trail)
       })
     } else {
@@ -331,7 +333,7 @@ function isIn(input, range) {
   const stringInput = getString(input, true)
 
   // Range is the array we are checking in
-  return some(range, function (entry) {
+  return some(range, (entry) => {
     return stringInput === getString(entry, true)
   })
 }
@@ -635,7 +637,7 @@ comparators.push({
     }
 
     if (isArray(input)) {
-      return some(input, function (i) {
+      return some(input, (i) => {
         // dateCompare(input, range, type, format, timezone)
         return dateCompare(i, mustMatchValue, 'date', null, options.timezone)
       })
@@ -657,7 +659,7 @@ comparators.push({
     }
 
     if (isArray(input)) {
-      return some(input, function (i) {
+      return some(input, (i) => {
         // dateCompare(input, range, type, format, timezone)
         return dateCompare(
           i,
@@ -798,7 +800,7 @@ comparators.push({
     }
 
     if (isArray(input)) {
-      return some(input, function (i) {
+      return some(input, (i) => {
         // dateCompare(input, range, type, format, timezone)
         return dateCompare(i, mustMatchValue, 'week', null, options.timezone)
       })
@@ -838,7 +840,7 @@ comparators.push({
     // },
 
     if (isArray(input)) {
-      return some(input, function (i) {
+      return some(input, (i) => {
         // dateCompare(input, range, type, format, timezone)
         return dateCompare(i, mustMatchValue, 'month', null, options.timezone)
       })
@@ -859,7 +861,7 @@ comparators.push({
     }
 
     if (isArray(input)) {
-      return some(input, function (i) {
+      return some(input, (i) => {
         // dateCompare(input, range, type, format, timezone)
         return dateCompare(i, mustMatchValue, 'year', null, options.timezone)
       })
@@ -883,7 +885,7 @@ comparators.push({
     const mustMatchString = String(mustMatchValue)
 
     if (isArray(input)) {
-      return some(input, function (i) {
+      return some(input, (i) => {
         const weekdayInteger = String(moment(i).weekday())
         return includes(mustMatchString, weekdayInteger)
       })
@@ -906,7 +908,7 @@ comparators.push({
     }
     const mustMatchString = String(mustMatchValue)
     if (isArray(input)) {
-      return !some(input, function (i) {
+      return !some(input, (i) => {
         const weekdayInteger = String(moment(i).weekday())
         return includes(mustMatchString, weekdayInteger)
       })
@@ -937,7 +939,7 @@ comparators.push({
         return
       }
 
-      return some(input, function (i) {
+      return some(input, (i) => {
         // dateCompare(input, range, type, format, timezone)
         return dateCompare(i, mustMatchValue, 'before', null, options.timezone)
       })
@@ -971,7 +973,7 @@ comparators.push({
         return
       }
 
-      return some(input, function (i) {
+      return some(input, (i) => {
         // dateCompare(input, range, type, format, timezone)
         return dateCompare(i, mustMatchValue, 'after', null, options.timezone)
       })
@@ -1008,7 +1010,7 @@ comparators.push({
       }
 
       // Every entry is not before
-      return every(input, function (i) {
+      return every(input, (i) => {
         // dateCompare(input, range, type, format, timezone)
         return !dateCompare(i, mustMatchValue, 'before', null, options.timezone)
       })
@@ -1043,7 +1045,7 @@ comparators.push({
       }
 
       // Every entry is not after
-      const allMatch = every(input, function (i) {
+      const allMatch = every(input, (i) => {
         // dateCompare(input, range, type, format, timezone)
         return !dateCompare(i, mustMatchValue, 'after', null, options.timezone)
       })
@@ -1084,7 +1086,7 @@ comparators.push({
         return
       }
 
-      return some(input, function (i) {
+      return some(input, (i) => {
         // dateCompare(input, range, type, format, timezone)
         return dateCompare(
           i,
@@ -1127,7 +1129,7 @@ comparators.push({
         return
       }
 
-      return some(input, function (i) {
+      return some(input, (i) => {
         // dateCompare(input, range, type, format, timezone)
         return dateCompare(
           i,
@@ -1172,7 +1174,7 @@ comparators.push({
         return value
       }
 
-      value = some(input, function (i) {
+      value = some(input, (i) => {
         // dateCompare(input, range, type, format, timezone)
         return dateCompare(i, mustMatchValue, 'next', null, options.timezone)
       })
@@ -1207,7 +1209,7 @@ comparators.push({
         return value
       }
 
-      value = some(input, function (i) {
+      value = some(input, (i) => {
         // dateCompare(input, range, type, format, timezone)
         return dateCompare(i, mustMatchValue, 'past', null, options.timezone)
       })
@@ -1242,7 +1244,7 @@ comparators.push({
         return !value
       }
 
-      value = some(input, function (i) {
+      value = some(input, (i) => {
         // dateCompare(input, range, type, format, timezone)
         return dateCompare(i, mustMatchValue, 'next', null, options.timezone)
       })
@@ -1277,7 +1279,7 @@ comparators.push({
         return !value
       }
 
-      value = some(input, function (i) {
+      value = some(input, (i) => {
         // dateCompare(input, range, type, format, timezone)
         return dateCompare(i, mustMatchValue, 'past', null, options.timezone)
       })
@@ -1305,7 +1307,7 @@ comparators.push({
     date2.setHours(0, 0, 0, 0)
 
     if (isArray(input)) {
-      return some(input, function (i) {
+      return some(input, (i) => {
         const checkDate = new Date(i)
         checkDate.setHours(0, 0, 0, 0)
         return isBetween(checkDate.getTime(), date1.getTime(), date2.getTime())
@@ -1336,7 +1338,7 @@ comparators.push({
     date2.setHours(0, 0, 0, 0)
 
     if (isArray(input)) {
-      return !some(input, function (i) {
+      return !some(input, (i) => {
         const checkDate = new Date(i)
         checkDate.setHours(0, 0, 0, 0)
         return isBetween(checkDate.getTime(), date1.getTime(), date2.getTime())
@@ -1362,7 +1364,7 @@ comparators.push({
 
     if (isArray(input)) {
       // Check if any match
-      return some(input, function (i) {
+      return some(input, (i) => {
         return isIn(i, mustMatchValue)
       })
     } else {
@@ -1392,7 +1394,7 @@ comparators.push({
       options = {}
     }
     if (isArray(input)) {
-      return !some(input, function (i) {
+      return !some(input, (i) => {
         return isIn(i, mustMatchValue)
       })
     } else {
@@ -1421,7 +1423,7 @@ comparators.push({
       options = {}
     }
     if (isArray(input)) {
-      return some(input, function (i) {
+      return some(input, (i) => {
         return isEqual(i, mustMatchValue)
       })
     } else {
@@ -1450,7 +1452,7 @@ comparators.push({
       options = {}
     }
     if (isArray(input)) {
-      return !some(input, function (i) {
+      return !some(input, (i) => {
         return isEqual(i, mustMatchValue)
       })
     } else {
@@ -1479,7 +1481,7 @@ comparators.push({
       options = {}
     }
     if (isArray(input)) {
-      return some(input, function (i) {
+      return some(input, (i) => {
         return startsWith(getString(i), getString(mustMatchValue))
       })
     } else {
@@ -1498,7 +1500,7 @@ comparators.push({
       options = {}
     }
     if (isArray(input)) {
-      return some(input, function (i) {
+      return some(input, (i) => {
         return endsWith(getString(i), getString(mustMatchValue))
       })
     } else {
@@ -1514,7 +1516,7 @@ comparators.push({
 
   match(input, mustMatchValue) {
     if (isArray(input)) {
-      return some(input, function (i) {
+      return some(input, (i) => {
         return isSimilar(i, mustMatchValue)
       })
     } else {
@@ -1533,7 +1535,7 @@ comparators.push({
       options = {}
     }
     if (isArray(input)) {
-      return some(input, function (i) {
+      return some(input, (i) => {
         return isContained(mustMatchValue, i)
       })
     } else {
@@ -1551,7 +1553,7 @@ comparators.push({
       options = {}
     }
     if (isArray(input)) {
-      return !some(input, function (i) {
+      return !some(input, (i) => {
         return isContained(mustMatchValue, i)
       })
     } else {
@@ -1710,7 +1712,7 @@ comparators.push({
       options = {}
     }
     if (isArray(input)) {
-      return !some(input, function (i) {
+      return !some(input, (i) => {
         return startsWith(getString(i), getString(mustMatchValue))
       })
     } else {
@@ -1728,7 +1730,7 @@ comparators.push({
       options = {}
     }
     if (isArray(input)) {
-      return !some(input, function (i) {
+      return !some(input, (i) => {
         return endsWith(getString(i), getString(mustMatchValue))
       })
     } else {
@@ -1756,7 +1758,7 @@ const comparatorLookup = {}
 const comparatorTypeLookup = {}
 
 // Loop through each available comparator
-each(comparators, function (comparator) {
+each(comparators, (comparator) => {
   // console.log('comparators', comparator.title)
   // map each comparator
   comparatorLookup[comparator.operator] = comparator
@@ -1770,7 +1772,7 @@ each(comparators, function (comparator) {
   }
 
   // And map to each type it's restricted for
-  each(restrictTypes, function (type) {
+  each(restrictTypes, (type) => {
     let existing = comparatorTypeLookup[type]
 
     if (!existing) {
@@ -1933,7 +1935,7 @@ export function filterGroupMatch(filterGroup, filterOptions, item) {
   if (validFilters && validFilters.length) {
     switch (operator) {
       case 'or':
-        returnValue = some(validFilters, function (filterBlock) {
+        returnValue = some(validFilters, (filterBlock) => {
           const wasMatch = filterMatch(filterBlock, filterOptions, item)
 
           return wasMatch
@@ -1941,7 +1943,7 @@ export function filterGroupMatch(filterGroup, filterOptions, item) {
         break
       case 'nor':
         // If any of these return true
-        returnValue = some(validFilters, function (filterBlock) {
+        returnValue = some(validFilters, (filterBlock) => {
           const wasMatch = filterMatch(filterBlock, filterOptions, item)
           return !wasMatch
         })
@@ -1949,7 +1951,7 @@ export function filterGroupMatch(filterGroup, filterOptions, item) {
         break
       case 'and':
       default:
-        returnValue = every(validFilters, function (filterBlock) {
+        returnValue = every(validFilters, (filterBlock) => {
           const wasMatch = filterMatch(filterBlock, filterOptions, item)
           // if(!wasMatch) {
           //     //console.log(wasMatch, 'was not a match', filterBlock)
@@ -1999,7 +2001,7 @@ export function filter(items, options) {
     return items
   }
 
-  return filter(items, function (item) {
+  return filter(items, (item) => {
     // There is filter criteria
     if (hasActiveFilters) {
       // Check if it matches the filters and if it doesn't
@@ -2046,7 +2048,7 @@ export function filter(items, options) {
               searchIsCorrect = true
             } else {
               // If it's a Multiword Match
-              const multiMatch = every(searchPieces, function (partial) {
+              const multiMatch = every(searchPieces, (partial) => {
                 return (
                   includes(itemTitle, partial) ||
                   includes(keywordString, partial)
@@ -2062,13 +2064,13 @@ export function filter(items, options) {
 
           // Search is correct
           if (!searchIsCorrect) {
-            function recursiveDeepSearch(entry) {
+            const recursiveDeepSearch = (entry) => {
               if (isString(entry)) {
                 return matchAnyString(searchKeywords, entry)
               }
 
               if (isArray(entry) || isObject(entry)) {
-                return some(entry, function (value) {
+                return some(entry, (value) => {
                   return recursiveDeepSearch(value)
                 })
               }
@@ -2141,7 +2143,7 @@ export function filterMatch(filter, filterOptions, item) {
       }
 
       // Ensure that none of the sub items match
-      return every(subItems, function (subItem) {
+      return every(subItems, (subItem) => {
         return filterMatch(newFilter, filterOptions, subItem)
       })
     } else {
@@ -2150,7 +2152,7 @@ export function filterMatch(filter, filterOptions, item) {
       }
 
       // Find as soon as there is a match
-      const someMatch = some(subItems, function (subItem) {
+      const someMatch = some(subItems, (subItem) => {
         const isAMatch = filterMatch(newFilter, filterOptions, subItem)
         // console.log('sub item has a match', isAMatch, subItem)
         return isAMatch
@@ -2276,7 +2278,7 @@ export function filterMatch(filter, filterOptions, item) {
     const discriminator = discriminatorPieces[1]
 
     if (discriminator && key !== 'tags') {
-      itemValue = filter(itemValue, function (realm) {
+      itemValue = filter(itemValue, (realm) => {
         return (
           realm.definition === discriminator ||
           realm._discriminatorType === discriminator ||
@@ -2324,7 +2326,7 @@ export function filterMatch(filter, filterOptions, item) {
     // itemValue should be an array
     if (arrayValue && arrayValue.length) {
       // We need to filter the arrayValue array to match our criteria
-      arrayValue = filter(arrayValue, function (entry) {
+      arrayValue = filter(arrayValue, (entry) => {
         const val = filterMatch(
           { filters: filter.criteria },
           filterOptions,
@@ -2504,7 +2506,7 @@ export function allKeys(initFields, config) {
 
   const definitionFields = chain(config)
     .get('definition.fields')
-    .map(function (field) {
+    .map((field) => {
       if (basicTypeName === 'interaction') {
         return Object.assign({}, field, {
           prefixKey: 'rawData' // .' + field.key,
@@ -2542,83 +2544,12 @@ export function allKeys(initFields, config) {
     })
     .value()
 
-  function getFlattenedFields(array, trail, titles) {
-    return chain(array)
-      .map((inputField) => {
-        // Create a new object so we don't mutate
-        const field = Object.assign({}, inputField)
-
-        const returnValue = []
-
-        if (!trail.length) {
-          if (field.prefixKey) {
-            trail.push(field.prefixKey)
-          }
-        }
-
-        // console.log('FIELD', field)
-
-        // If there are sub fields
-        if (field.fields && field.fields.length) {
-          // console.log('WE HAVE MORE FIELDS', field.directive, field.asObject);
-
-          if (field.asObject || field.directive === 'embedded') {
-            // console.log('WE ARE AN EMBDEDD THING', field.title);
-            // Push the field itself
-            trail.push(field.key)
-            titles.push(field.title)
-
-            field.trail = trail.slice()
-            field.titles = titles.slice()
-
-            trail.pop()
-            titles.pop()
-            returnValue.push(field)
-
-            // Prepend the key to all lowed fields
-
-            if (field.maximum !== 1) {
-              // trail.push(field.key + '[' + indexIterator + ']');
-              trail.push(field.key + '[]')
-              titles.push(field.title)
-            } else {
-              trail.push(field.key)
-              titles.push(field.title)
-            }
-          }
-
-          const fields = getFlattenedFields(field.fields, trail, titles)
-
-          // console.log('SUB FIELDS', fields);
-          if (field.asObject || field.directive === 'embedded') {
-            trail.pop()
-            titles.pop()
-          }
-          returnValue.push(fields)
-        } else {
-          // Push the field key
-          trail.push(field.key)
-          titles.push(field.title)
-
-          field.trail = trail.slice()
-          field.titles = titles.slice()
-          trail.pop()
-          titles.pop()
-          returnValue.push(field)
-        }
-
-        return returnValue
-      })
-      .flattenDeep()
-      .value()
-  }
-
   let detailSheetFields = []
 
   if (config && config.details) {
     detailSheetFields = reduce(
       config.details,
-      function (set, detailSheet) {
+      (set, detailSheet) => {
         // //Get all the flattened fields
         const flattened = getFlattenedFields(detailSheet.fields, [], [])
 
@@ -2736,7 +2667,7 @@ export function getDeepValue(set, node, keyPath) {
     const splitKey = splitPieces.shift()
     const subPath = splitPieces.join('[]')
     const subItems = get(node, splitKey) || []
-    return each(subItems, function (subItem) {
+    return each(subItems, (subItem) => {
       getDeepValue(set, subItem, subPath)
     })
   }
@@ -2750,7 +2681,7 @@ export function getDeepValue(set, node, keyPath) {
 
   if (isArray(value)) {
     if (value.length) {
-      each(value, function (v) {
+      each(value, (v) => {
         addValueToSet(set, v)
       })
     }

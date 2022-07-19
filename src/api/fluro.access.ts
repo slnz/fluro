@@ -2,6 +2,16 @@ import { chain, some, includes, map, intersection, reduce } from 'lodash'
 
 import type FluroCore from './fluro.core'
 import FluroDispatcher from './fluro.dispatcher'
+import { Type } from './fluro.types'
+
+interface TypeWithPermissions extends Type {
+  permissions: {
+    title: string
+    value: string
+    description: string
+  }[]
+}
+
 /**
  * Creates a new FluroAccess service
  * This module provides helpful functions and tools for managing and
@@ -383,13 +393,13 @@ export default class FluroAccess {
       return true
     }
 
-    const permissionSets = user.permissionSets
+    const permissionSets: { permissions: string[] }[] = user.permissionSets
     // Get all of the possible permissions
     const permissions = chain(permissionSets)
       .reduce((results, set) => {
         results.push(set.permissions)
         return results
-      }, [])
+      }, [] as string[][])
       // .map(retrieveSubRealms)
       .flattenDeep()
       .compact()
@@ -974,9 +984,11 @@ export default class FluroAccess {
           // Loop through and structure the available permissions
           const permissions = chain(terms)
             // .orderBy('title')
-            .reduce((set, type) => {
+            .reduce((set, importedType) => {
               // Create a copy so we dont pollute the types entry
-              type = JSON.parse(JSON.stringify(type))
+              const type: TypeWithPermissions = JSON.parse(
+                JSON.stringify(importedType)
+              )
               // Get the basic type, or otherwise it is a basic type
               const basicType = type.parentType || type.definitionName
               const definitionName = type.definitionName
@@ -1201,7 +1213,7 @@ export default class FluroAccess {
               // }
               // Return the set
               return set
-            }, [])
+            }, [] as TypeWithPermissions[])
             // .values()
             .orderBy('title')
             .value()

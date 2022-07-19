@@ -5,14 +5,18 @@ import FluroDispatcher from './fluro.dispatcher'
 
 // This is the bucket for each kind of global stat
 export default class FluroStatsStorage {
-  inflightRequest
-  total = 0
-  store
+  inflightRequest: Promise<unknown> | null
+  store: {
+    key: string
+    name: string
+    total: number
+  }
+
   processing = false
   dispatcher: FluroDispatcher
   constructor(
     private core: FluroCore,
-    private statName,
+    private statName: string,
     private targetID,
     private unique
   ) {
@@ -27,24 +31,22 @@ export default class FluroStatsStorage {
 
     this.store = {
       key,
-      name: statName
+      name: statName,
+      total: 0
     }
 
-    // Create the getters
-    Object.defineProperty(this, 'key', {
-      value: key,
-      writable: false
-    })
-
-    // Create the getters
-    Object.defineProperty(this, 'name', {
-      value: statName,
-      writable: false
-    })
     this.inflightRequest = this.refresh().then(
       this.refreshComplete,
       this.refreshFailed
     )
+  }
+
+  get name() {
+    return this.store.name
+  }
+
+  get key() {
+    return this.store.key
   }
 
   refresh(): Promise<unknown> {
@@ -77,27 +79,17 @@ export default class FluroStatsStorage {
 
   private refreshComplete(res) {
     const total = get(res, 'data.total')
-
-    this.store.total = this.total = total
-
-    // console.log(total)
+    this.store.total = total
     this.finish()
   }
 
-  private refreshFailed(err) {
-    console.log(err)
+  private refreshFailed() {
     this.finish()
   }
 
   private finish() {
     this.processing = false
-
-    // Dispatch event
-    // console.log('UPDATED WITH NEW STATS', store.total);
-
     this.dispatcher.dispatch('change', this.store)
-
-    // Kill the inflight request
     this.inflightRequest = null
   }
 

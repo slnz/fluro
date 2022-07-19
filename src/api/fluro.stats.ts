@@ -20,7 +20,7 @@ export default class FluroStats {
 
     // Get/Create the stat storage bucket
     const store = this.getUserStore(statName, true)
-    return store.set(targetID)
+    return store?.set(targetID)
   }
 
   // Helper function to quickly unset a stat
@@ -29,7 +29,7 @@ export default class FluroStats {
 
     // Get/Create the stat storage bucket
     const store = this.getUserStore(statName, true)
-    return store.unset(targetID)
+    return store?.unset(targetID)
   }
 
   refresh() {

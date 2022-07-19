@@ -426,6 +426,7 @@ export function groupEventByDate(events) {
     .reduce((set, row, index) => {
       let format = 'dddd D MMMM'
 
+      // eslint-disable-next-line new-cap
       const startDate = new moment(
         row.startDate ||
           get(row, 'event.startDate') ||
@@ -565,7 +566,7 @@ export function countdown(date, zeroPadded) {
   const hours = Math.floor((milliseconds % oneDay) / oneHour)
   const days = Math.floor(milliseconds / oneDay)
   if (zeroPadded) {
-    function pad(input) {
+    const pad = (input) => {
       input = Math.ceil(input)
       if (String(input).length === 1) {
         return `0${input}`

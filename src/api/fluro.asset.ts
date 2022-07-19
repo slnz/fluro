@@ -386,6 +386,7 @@ export default class FluroAsset {
         params.h = h
       }
     }
+    // eslint-disable-next-line no-prototype-builtins
     if (!params.hasOwnProperty('quality')) {
       params.quality = 80
     }
