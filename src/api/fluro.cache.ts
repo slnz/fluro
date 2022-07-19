@@ -25,7 +25,7 @@ const FluroCache = {
    * @param  {string} key The key for the cache you want to retrieve
    * @return {LRUCache} The cache store for the specified key
    */
-  get(key, options) {
+  get(key, options?) {
     if (caches[key]) {
       return caches[key]
     }

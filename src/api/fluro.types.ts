@@ -1,4 +1,6 @@
 import { chain, each, includes, startCase, map, orderBy } from 'lodash'
+
+import type FluroCore from './fluro.core'
 /**
  * Creates a new FluroTypes service
  * This module provides a number of helpful functions for retrieving, translating and understanding types, schemas and definitions
@@ -6,13 +8,20 @@ import { chain, each, includes, startCase, map, orderBy } from 'lodash'
  * @alias types
  * @constructor
  * @hideconstructor
- * @param {this.FluroCore} fluro A reference to the parent instance of the this.FluroCore module. This module is usually created by a this.FluroCore instance that passes itself in as the first argument.
+ * @param {FluroCore} fluro A reference to the parent instance of the FluroCore module. This module is usually created by a FluroCore instance that passes itself in as the first argument.
  */
 export default class FluroTypes {
-  glossary = {}
+  glossary: {
+    [key: string]: {
+      definitionName: string
+      parentType?: string
+      plural: string
+    }
+  } = {}
+
   inflightTermsRequest
 
-  constructor(private FluroCore) {}
+  constructor(private core: FluroCore) {}
 
   icon(type, library) {
     if (!library) {
@@ -206,11 +215,9 @@ export default class FluroTypes {
     }
 
     return new Promise((resolve, reject) => {
-      this.FluroCore.api
-        .get(`/defined/type/${definedName}`, options)
-        .then((res) => {
-          resolve(res.data)
-        }, reject)
+      this.core.api.get(`/defined/type/${definedName}`, options).then((res) => {
+        resolve(res.data)
+      }, reject)
     })
   }
 
@@ -271,7 +278,7 @@ export default class FluroTypes {
     }
 
     return new Promise((resolve, reject) => {
-      return this.FluroCore.api.get(`/defined`, options).then((res) => {
+      return this.core.api.get(`/defined`, options).then((res) => {
         resolve(res.data)
       }, reject)
     })
@@ -304,7 +311,7 @@ export default class FluroTypes {
       options.cache = false
 
       this.glossary = {}
-      return this.FluroCore.api.get(`/defined/terms`, options).then((res) => {
+      return this.core.api.get(`/defined/terms`, options).then((res) => {
         each(res.data, (entry, key) => {
           entry.definitionName = key
         })
@@ -506,7 +513,7 @@ export default class FluroTypes {
             }
         }
         return new Promise(function(resolve, reject) {
-            this.FluroCore.api.post('/defined', options)
+            this.core.api.post('/defined', options)
                 .then(function(res) {
                                         resolve(res.data);
                 }, reject);
@@ -551,7 +558,7 @@ export default class FluroTypes {
       console.log('GET THE PROCESS TYPES')
       // return resolve([]);
 
-      this.FluroCore.api
+      this.core.api
         .get(`/process/types/${typeName}`, {
           params: options
         })
@@ -585,7 +592,7 @@ export default class FluroTypes {
   //         }
   //     }
   //     return new Promise(function(resolve, reject) {
-  //         this.FluroCore.api.get(`/post/types/${typeName}`, {
+  //         this.core.api.get(`/post/types/${typeName}`, {
   //                 params: options
   //             })
   //             .then(function(res) {
@@ -609,7 +616,7 @@ export default class FluroTypes {
     options.types = types
 
     return new Promise((resolve, reject) => {
-      this.FluroCore.api.post('/defined', options).then((res) => {
+      this.core.api.post('/defined', options).then((res) => {
         resolve(res.data)
       }, reject)
     })
@@ -628,7 +635,7 @@ export default class FluroTypes {
   //             return Promise.resolve(definitionCache[type]);
   //         }
   //         return new Promise(function(resolve, reject) {
-  //              this.FluroCore.api.get(`/defined/types/${type}`)
+  //              this.core.api.get(`/defined/types/${type}`)
   //             .then(function(res) {
   //                 definitionCache[type] = res.data;
   //                 resolve(definitionCache[type]);

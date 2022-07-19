@@ -1,21 +1,22 @@
 import { each, filter } from 'lodash'
 
+import type FluroCore from './fluro.core'
 import FluroStatsStorage from './fluro.stats.storage'
 import FluroStatsUserStorage from './fluro.stats.user.storage'
 
 // This is the main service that creates the buckets and manages them all
 export default class FluroStats {
-  userStores = {}
-  globalStores = {}
-  constructor(private Fluro) {
-    if (!Fluro.api) {
+  userStores: { [key: string]: FluroStatsUserStorage } = {}
+  globalStores: { [key: string]: FluroStatsStorage } = {}
+  constructor(private core: FluroCore) {
+    if (!this.core.api) {
       throw new Error(`Can't Instantiate FluroStats before FluroAPI exists`)
     }
   }
 
   // Helper function to quickly set a stat
   set(statName, target) {
-    const targetID = this.Fluro.utils.getStringID(target)
+    const targetID = this.core.utils.getStringID(target)
 
     // Get/Create the stat storage bucket
     const store = this.getUserStore(statName, true)
@@ -24,7 +25,7 @@ export default class FluroStats {
 
   // Helper function to quickly unset a stat
   unset(statName, target) {
-    const targetID = this.Fluro.utils.getStringID(target)
+    const targetID = this.core.utils.getStringID(target)
 
     // Get/Create the stat storage bucket
     const store = this.getUserStore(statName, true)
@@ -32,7 +33,7 @@ export default class FluroStats {
   }
 
   refresh() {
-    const promises = []
+    const promises: Promise<unknown>[] = []
 
     // Refreshes all the stats
     each(this.userStores, (store) => {
@@ -69,7 +70,7 @@ export default class FluroStats {
       return this.userStores[key]
     }
 
-    const userStore = new FluroStatsUserStorage(this.Fluro, statName, unique)
+    const userStore = new FluroStatsUserStorage(this.core, statName, unique)
 
     // If the user changes a stat, check if we need to
     userStore.addEventListener('change', (data) => {
@@ -111,7 +112,7 @@ export default class FluroStats {
     }
 
     this.globalStores[combinedKey] = new FluroStatsStorage(
-      this.Fluro,
+      this.core,
       statName,
       targetID,
       unique

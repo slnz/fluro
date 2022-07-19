@@ -23,7 +23,9 @@ module.exports = {
       files: ['**/*.js'],
       rules: {
         '@typescript-eslint/explicit-function-return-type': 'off',
-        '@typescript-eslint/no-var-requires': 'off'
+        '@typescript-eslint/no-var-requires': 'off',
+        '@typescript-eslint/no-useless-constructor': 'off',
+        'no-useless-constructor': 'error'
       }
     }
   ],
@@ -53,7 +55,10 @@ module.exports = {
     'import/newline-after-import': 'error',
     'import/no-named-default': 'error',
     'import/no-anonymous-default-export': 'error',
-    'import/dynamic-import-chunkname': 'error'
+    'import/dynamic-import-chunkname': 'error',
+    'no-useless-constructor': 'off',
+    '@typescript-eslint/no-useless-constructor': 'error',
+    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }]
     // '@typescript-eslint/explicit-function-return-type': 'error'
   }
 }

@@ -96,7 +96,11 @@ export function currencySymbol(currency) {
   }
 }
 export function getAvailableCurrencies(defaultCountryCode) {
-  let array = []
+  let array: {
+    name: string
+    value: string
+    countryCode: { [key: string]: boolean }
+  }[] = []
   array.push({
     name: `USD (${FluroUtils.currencySymbol('usd')})`,
     value: 'usd',
@@ -522,7 +526,7 @@ export function getStringID(input, asObjectID?) {
  * // Returns ['5cb3d8b3a2219970e6f86927', '5cb3d8b3a2219970e6f86927', '5cb3d8b3a2219970e6f86927']
  * fluro.utils.arrayIDs([{_id:'5cb3d8b3a2219970e6f86927'}, {_id:'5cb3d8b3a2219970e6f86927'}, null, '5cb3d8b3a2219970e6f86927'])
  */
-export function arrayIDs(array, asObjectID) {
+export function arrayIDs(array, asObjectID?): string[] {
   if (!array) {
     return []
   }

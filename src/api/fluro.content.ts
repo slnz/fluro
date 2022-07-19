@@ -3,6 +3,8 @@ import { assign, orderBy, reduce, uniq } from 'lodash'
 
 import FluroContentListService from '../services/FluroContentListService'
 
+import type FluroCore from './fluro.core'
+
 const CancelToken = axios.CancelToken
 /**
  * Creates a new FluroContent instance.
@@ -17,8 +19,8 @@ export default class FluroContent {
   inflightRefreshRequest
   currentSearch
 
-  constructor(private fluro) {
-    if (!this.fluro.api) {
+  constructor(private core: FluroCore) {
+    if (!this.core.api) {
       throw new Error(`Can't Instantiate FluroContent before FluroAPI exists`)
     }
   }
@@ -75,7 +77,7 @@ export default class FluroContent {
       // }
 
       // Retrieve the query results
-      this.fluro.api
+      this.core.api
         .get(`/content/search/${terms}`, config)
         .then((res) => {
           resolve(res.data)
@@ -129,7 +131,7 @@ export default class FluroContent {
 
       // Retrieve the definition from the server and send it back to
       // the user
-      this.fluro.api
+      this.core.api
         .get(`/defined/${definitionName}`)
         .then((res) => {
           resolve(res.data)
@@ -192,7 +194,7 @@ export default class FluroContent {
       // }
 
       // Retrieve the query results
-      this.fluro.api
+      this.core.api
         .get(`/mention/${terms}`, config)
         .then((res) => {
           resolve(res.data)
@@ -217,7 +219,7 @@ export default class FluroContent {
    */
   query(queryID, options, requestOptions) {
     // Get as just a query
-    queryID = this.fluro.utils.getStringID(queryID)
+    queryID = this.core.utils.getStringID(queryID)
     if (!options) {
       options = {}
     }
@@ -246,7 +248,7 @@ export default class FluroContent {
       }
 
       // Retrieve the query results
-      this.fluro.api
+      this.core.api
         .get(`/content/_query/${queryID}`, requestOptions)
         .then((res) => {
           resolve(res.data)
@@ -271,7 +273,7 @@ export default class FluroContent {
     }
 
     // Ensure it's a simple single ID
-    id = this.fluro.utils.getStringID(id)
+    id = this.core.utils.getStringID(id)
 
     if (!params) {
       params = {}
@@ -284,7 +286,7 @@ export default class FluroContent {
       }
 
       //       // Retrieve the query results
-      this.fluro.api.get(`/content/get/${id}`, requestOptions).then((res) => {
+      this.core.api.get(`/content/get/${id}`, requestOptions).then((res) => {
         resolve(res.data)
       }, reject)
     })
@@ -316,7 +318,7 @@ export default class FluroContent {
       }
 
       // Retrieve the query results
-      this.fluro.api
+      this.core.api
         .get(`/content/external/${id}`, requestOptions)
         .then((res) => {
           resolve(res.data)
@@ -349,7 +351,7 @@ export default class FluroContent {
       }
 
       // Retrieve the query results
-      this.fluro.api.get(`/content/slug/${id}`, requestOptions).then((res) => {
+      this.core.api.get(`/content/slug/${id}`, requestOptions).then((res) => {
         resolve(res.data)
       }, reject)
     })
@@ -380,7 +382,7 @@ export default class FluroContent {
       }
 
       // Retrieve the query results
-      this.fluro.api
+      this.core.api
         .post(`/content/_query`, criteria, requestOptions)
         .then((res) => {
           resolve(res.data)
@@ -401,7 +403,7 @@ export default class FluroContent {
    * fluro.content.related('5be504eabf33991239599d63', {select:'title'})
    */
   related(id, params, requestOptions) {
-    id = this.fluro.utils.getStringID(id)
+    id = this.core.utils.getStringID(id)
     if (!id) {
       throw Error(`No id specified ${id}`)
     }
@@ -418,7 +420,7 @@ export default class FluroContent {
       }
       // service.retrieve(criteria, requestOptions).then(resolve, reject);
       // Retrieve the query results
-      this.fluro.api
+      this.core.api
         .get(`/content/related/${id}`, requestOptions)
         .then((res) => {
           resolve(res.data)
@@ -440,7 +442,7 @@ export default class FluroContent {
    * fluro.content.form('58dca23c21428d2d045a1cf7', {testing:true})
    */
   form(id, options, requestOptions) {
-    id = this.fluro.utils.getStringID(id)
+    id = this.core.utils.getStringID(id)
     if (!id) {
       throw Error(`No id specified ${id}`)
     }
@@ -460,7 +462,7 @@ export default class FluroContent {
       // }
       // service.retrieve(criteria, requestOptions).then(resolve, reject);
       //       // Retrieve the query results
-      this.fluro.api.get(`/form/${id}`, requestOptions).then(() => {
+      this.core.api.get(`/form/${id}`, requestOptions).then(() => {
         //         resolve(res.data)
       }, reject)
     })
@@ -487,7 +489,7 @@ export default class FluroContent {
       const requestOptions = options
 
       // Retrieve the query results
-      this.fluro.api
+      this.core.api
         .post(`/interact/${type}`, submission, requestOptions)
         .then((res) => {
           resolve(res.data)
@@ -510,7 +512,7 @@ export default class FluroContent {
    * fluro.content.submitPost('5be504eabf33991239599d63', 'comment', {data:{customField:'My message'}}, {reply:'5be504eabf33991239599d63'})
    */
   submitPost(id, type, body, options) {
-    id = this.fluro.utils.getStringID(id)
+    id = this.core.utils.getStringID(id)
     if (!id) {
       throw Error(`No target specified ${id}`)
     }
@@ -524,7 +526,7 @@ export default class FluroContent {
           // params: {}
         }
       // Retrieve the query results
-      this.fluro.api
+      this.core.api
         .post(`/post/${id}/${type}`, body, requestOptions)
         .then((res) => {
           resolve(res.data)
@@ -548,7 +550,7 @@ export default class FluroContent {
    * fluro.content.thread('5be504eabf33991239599d63', 'comment', {data:{customField:'My message'}}, {reply:'5be504eabf33991239599d63'})
    */
   thread(id, type, options) {
-    id = this.fluro.utils.getStringID(id)
+    id = this.core.utils.getStringID(id)
     if (!id) {
       throw Error(`No target specified ${id}`)
     }
@@ -560,7 +562,7 @@ export default class FluroContent {
         // params: {}
       }
       // Retrieve the query results
-      this.fluro.api.get(`/post/${id}/${type}`, requestOptions).then((res) => {
+      this.core.api.get(`/post/${id}/${type}`, requestOptions).then((res) => {
         resolve(res.data)
       }, reject)
     })
@@ -581,13 +583,13 @@ export default class FluroContent {
    *       // Would return ['Frank', 'Lucy', 'Marissa']
    * })
    */
-  values(ids, key, options) {
-    ids = this.fluro.utils.arrayIDs(ids)
+  values(ids, key?: string, options?) {
+    ids = this.core.utils.arrayIDs(ids)
     // if (!ids | !ids.length ) {
     //     throw Error(`No ids specified ${ids}`);
     // }
-    if (!key | !key.length) {
-      throw Error(`No key specified `)
+    if (key == null || key.length === 0) {
+      throw Error('No key specified')
     }
     if (!options) {
       options = {}
@@ -604,7 +606,7 @@ export default class FluroContent {
       }
 
       // Retrieve the query results
-      return this.fluro.api.post(url, payload, options).then((res) => {
+      return this.core.api.post(url, payload, options).then((res) => {
         resolve(
           orderBy(res.data, (entry) => {
             return entry.title || entry
@@ -711,7 +713,7 @@ export default class FluroContent {
    *   filter,
    * }
    *
-   * let dataBucket = this.fluro.content.list('event', {
+   * let dataBucket = this.core.content.list('event', {
    *     perPage: 2,
    *     criteria,
    * });
@@ -731,7 +733,7 @@ export default class FluroContent {
    * dataBucket.addEventListener('page', function() { console.log('the current page was updated')});
    */
   list(typeName, options) {
-    return new FluroContentListService(typeName, this.fluro, options)
+    return new FluroContentListService(typeName, this.core, options)
   }
 
   /**
@@ -786,7 +788,7 @@ export default class FluroContent {
    */
   filter(typeName, criteria) {
     return new Promise((resolve, reject) => {
-      return this.fluro.api
+      return this.core.api
         .post(`/content/${typeName}/filter`, criteria)
         .then((res) => {
           return resolve(res.data)
@@ -817,9 +819,9 @@ export default class FluroContent {
     }
 
     // Ensure the ids are actually ids
-    ids = this.fluro.utils.arrayIDs(ids)
+    ids = this.core.utils.arrayIDs(ids)
     return new Promise((resolve, reject) => {
-      this.fluro.api
+      this.core.api
         .post(`/content/${typeName}/multiple`, {
           ids,
           select: options.select ? uniq(options.select) : undefined,
@@ -851,8 +853,8 @@ export default class FluroContent {
    * })
    */
   keys(ids, options) {
-    ids = this.fluro.utils.arrayIDs(ids)
-    if (!ids | !ids.length) {
+    ids = this.core.utils.arrayIDs(ids)
+    if (ids == null || ids.length === 0) {
       throw Error(`No ids specified ${ids}`)
     }
     if (!options) {
@@ -869,7 +871,7 @@ export default class FluroContent {
       }
 
       // Retrieve the query results
-      return this.fluro.api.post(url, payload, options).then((res) => {
+      return this.core.api.post(url, payload, options).then((res) => {
         resolve(res.data)
       }, reject)
     })
@@ -893,7 +895,7 @@ export default class FluroContent {
       options = {}
     }
 
-    const itemID = this.fluro.utils.getStringID(item)
+    const itemID = this.core.utils.getStringID(item)
     return new Promise((resolve, reject) => {
       // Load the proper thing
       this.get(itemID)
@@ -942,8 +944,8 @@ export default class FluroContent {
           }
           // Set the new item as active
           newItem.status = 'active'
-          const accountID = this.fluro.utils.getStringID(newItem.account)
-          const userAccountID = this.fluro.utils.getStringID(
+          const accountID = this.core.utils.getStringID(newItem.account)
+          const userAccountID = this.core.utils.getStringID(
             populatedItem.account
           )
           if (userAccountID !== accountID) {

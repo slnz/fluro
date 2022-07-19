@@ -1,5 +1,6 @@
 import { get } from 'lodash'
 
+import type FluroCore from './fluro.core'
 import FluroDispatcher from './fluro.dispatcher'
 
 // This is the bucket for each kind of global stat
@@ -10,7 +11,7 @@ export default class FluroStatsStorage {
   processing = false
   dispatcher: FluroDispatcher
   constructor(
-    private Fluro,
+    private core: FluroCore,
     private statName,
     private targetID,
     private unique
@@ -46,22 +47,22 @@ export default class FluroStatsStorage {
     )
   }
 
-  refresh() {
+  refresh(): Promise<unknown> {
     if (this.inflightRequest) {
       return this.inflightRequest
     }
 
-    let url = `${this.Fluro.apiURL}/stat/${this.targetID}/${this.statName}`
+    let url = `${this.core.apiURL}/stat/${this.targetID}/${this.statName}`
 
     if (this.unique) {
       url += '?unique=true'
     }
 
-    const loggedInUser = this.Fluro.auth.getCurrentUser()
+    const loggedInUser = this.core.auth.getCurrentUser()
 
     // If we are logged in as a user or an application
-    if (loggedInUser || this.Fluro.applicationToken) {
-      this.inflightRequest = this.Fluro.api.get(url, { cache: false })
+    if (loggedInUser || this.core.applicationToken) {
+      this.inflightRequest = this.core.api.get(url, { cache: false })
     } else {
       this.inflightRequest = new Promise((resolve) => {
         return resolve([])

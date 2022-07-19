@@ -1,3 +1,5 @@
+import type FluroCore from './fluro.core'
+
 /**
  * Creates a new FluroComponents instance.
  * This module provides a number of helper functions for working with Fluro components
@@ -9,8 +11,8 @@
 export default class FluroComponents {
   debug = false
 
-  constructor(private fluro) {
-    if (!this.fluro.utils) {
+  constructor(private core: FluroCore) {
+    if (!this.core.utils) {
       throw new Error(
         `Can't Instantiate FluroComponents before FluroUtils exists`
       )
@@ -26,8 +28,8 @@ export default class FluroComponents {
    */
   hydrateModel(componentID, model) {
     return new Promise((resolve, reject) => {
-      this.fluro.api
-        .post(`${this.fluro.apiURL}/components/${componentID}/hydrate`, model)
+      this.core.api
+        .post(`${this.core.apiURL}/components/${componentID}/hydrate`, model)
         .then((res) => {
           resolve(res.data)
         })
@@ -41,8 +43,8 @@ export default class FluroComponents {
         fields: true
       }
     }
-    const promise = this.fluro.utils.injectModule(
-      `${this.fluro.apiURL}/components/${componentID}/module`,
+    const promise = this.core.utils.injectModule(
+      `${this.core.apiURL}/components/${componentID}/module`,
       options
     )
     return promise

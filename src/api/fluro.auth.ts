@@ -1,5 +1,7 @@
+import { AxiosRequestConfig } from 'axios'
 import { assign, get, noop } from 'lodash'
 
+import type FluroCore from './fluro.core'
 import FluroDispatcher from './fluro.dispatcher'
 
 /**
@@ -19,8 +21,8 @@ export default class FluroAuth {
   retryCount = 0
   dispatcher
 
-  constructor(private fluro, private onChange) {
-    if (!this.fluro.api) {
+  constructor(private core: FluroCore, private onChange?) {
+    if (!this.core.api) {
       throw new Error(`Can't Instantiate FluroAuth before FluroAPI exists`)
     }
     // Create a new dispatcher
@@ -34,8 +36,13 @@ export default class FluroAuth {
       writable: false
     })
 
-    this.fluro.api.interceptors.request.use(
-      (config) => {
+    this.core.api.interceptors.request.use(
+      (
+        config: AxiosRequestConfig & {
+          bypassInterceptor?: boolean
+          application?: object
+        }
+      ) => {
         // If we want to bypass the interceptor
         // then just return the request
         if (config.bypassInterceptor) {
@@ -48,12 +55,12 @@ export default class FluroAuth {
         // If we aren't logged in or don't have a token
         let token
         let refreshToken
-        const applicationToken = this.fluro.applicationToken
+        const applicationToken = this.core.applicationToken
 
         // If we are running in an application context
-        if (config.application || this.fluro.GLOBAL_AUTH) {
-          token = get(fluro, 'app.user.token')
-          refreshToken = get(fluro, 'app.user.refreshToken')
+        if (config.application || this.core.GLOBAL_AUTH) {
+          token = get(this.core, 'app.user.token')
+          refreshToken = get(this.core, 'app.user.refreshToken')
         } else {
           // Get the token and refresh token
           token = get(this.store, 'user.token')
@@ -64,22 +71,22 @@ export default class FluroAuth {
         if (token) {
           // Set the token of the request as the user's access token
           originalRequest.headers.Authorization = 'Bearer ' + token
-          this.log('this.fluro.auth > using user token')
+          this.log('this.core.auth > using user token')
         } else if (applicationToken && applicationToken.length) {
           // If there is a static application token
           // For example we have logged out from a website
           // that has public content also
           originalRequest.headers.Authorization = 'Bearer ' + applicationToken
-          this.log('this.fluro.auth > using app token')
+          this.log('this.core.auth > using app token')
           return originalRequest
         } else {
           // Return the original request without a token
-          this.log('this.fluro.auth > no token')
+          this.log('this.core.auth > no token')
           return originalRequest
         }
         // If no refresh token
         if (!refreshToken) {
-          this.log('this.fluro.auth > no refresh token')
+          this.log('this.core.auth > no refresh token')
           // Continue with the original request
           return originalRequest
         }
@@ -90,8 +97,8 @@ export default class FluroAuth {
         // are still loading
         now.setSeconds(now.getSeconds() + 10)
         let expiryDate
-        if (config.application || this.fluro.GLOBAL_AUTH) {
-          expiryDate = get(this.fluro, 'app.user.expires')
+        if (config.application || this.core.GLOBAL_AUTH) {
+          expiryDate = get(this.core, 'app.user.expires')
         } else {
           expiryDate = get(this.store, 'user.expires')
         }
@@ -109,11 +116,11 @@ export default class FluroAuth {
         let isManagedUser =
           config.application ||
           get(this.store, 'user.accountType') === 'managed'
-        if (this.fluro.GLOBAL_AUTH) {
+        if (this.core.GLOBAL_AUTH) {
           isManagedUser = false
         }
         // The token is stale by this point
-        this.log('this.fluro.auth > token expired')
+        this.log('this.core.auth > token expired')
         return new Promise((resolve, reject) => {
           // Refresh the token
           this.refreshAccessToken(
@@ -122,7 +129,7 @@ export default class FluroAuth {
             config.application
           )
             .then((newToken) => {
-              this.log('this.fluro.auth > token refreshed', isManagedUser)
+              this.log('this.core.auth > token refreshed', isManagedUser)
               // Update the original request with our new token
               originalRequest.headers.Authorization = 'Bearer ' + newToken
               // And continue onward
@@ -130,7 +137,7 @@ export default class FluroAuth {
             })
             .catch((err) => {
               console.log('ERRRRRR', err)
-              this.log('this.fluro.auth > token refresh rejected', err)
+              this.log('this.core.auth > token refresh rejected', err)
               return reject(err)
             })
         })
@@ -139,22 +146,22 @@ export default class FluroAuth {
         return Promise.reject(error)
       }
     )
-    this.fluro.api.interceptors.response.use(
+    this.core.api.interceptors.response.use(
       (response) => {
         return response
       },
       (err) => {
         // Get the response status
         const status = get(err, 'response.status') || err.status
-        this.log('this.fluro.auth > error', status)
+        this.log('this.core.auth > error', status)
         switch (status) {
           case 401:
             console.log('ERROR CAPTURE HERE', err.response, err.config)
             // If we are running in an application context
-            if (get(err, 'config.application') || this.fluro.GLOBAL_AUTH) {
+            if (get(err, 'config.application') || this.core.GLOBAL_AUTH) {
               // Kill our app user store
-              if (this.fluro.app) {
-                this.fluro.app.user = null
+              if (this.core.app) {
+                this.core.app.user = null
               }
               return Promise.reject(err)
             }
@@ -207,7 +214,7 @@ export default class FluroAuth {
    */
   set(user, parameters?) {
     this.store.user = user
-    this.log('this.fluro.auth > user set')
+    this.log('this.core.auth > user set')
     return this.dispatch(parameters)
   }
 
@@ -217,22 +224,18 @@ export default class FluroAuth {
    * from memory
    * @alias auth.logout
    * @example
-   * this.fluro.auth.logout()
+   * this.core.auth.logout()
    */
   logout() {
     // Unauthenticated
     // delete store.token;
     delete this.store.user
-    this.fluro.cache.reset()
+    this.core.cache.reset()
     // delete store.refreshToken;
     // delete store.expires;
-    this.log('this.fluro.auth > user logout')
-    if (this.fluro.withCredentials) {
-      // Logout of the current application
-      window.location.href = '/fluro/logout'
-    }
+    this.log('this.core.auth > user logout')
     // if(window && window.localStorage) {
-    //    window.localStorage.removeItem('this.fluro.user');
+    //    window.localStorage.removeItem('this.core.user');
     // }
     return this.dispatch()
   }
@@ -249,18 +252,18 @@ export default class FluroAuth {
    * If you want to generate the session without affecting your current session you can set disableAutoAuthenticate to true
    * @return {Promise} Resolves to the user session object, or rejects with the responding error
    * @example
-   * this.fluro.auth.changeAccount('5be504eabf33991239599d63').then(function(userSession) {
+   * this.core.auth.changeAccount('5be504eabf33991239599d63').then(function(userSession) {
    *     // New user session will be set automatically
-   *     let newUserSession = this.fluro.auth.getCurrentUser();
+   *     let newUserSession = this.core.auth.getCurrentUser();
    * })
-   * this.fluro.auth.changeAccount('5be504eabf33991239599d63', {disableAutoAuthenticate:true}).then(function(userSession) {
+   * this.core.auth.changeAccount('5be504eabf33991239599d63', {disableAutoAuthenticate:true}).then(function(userSession) {
    *     // Set the session manually
-   *     this.fluro.auth.set(userSession)
+   *     this.core.auth.set(userSession)
    * })
    */
   changeAccount(accountID, options) {
     // Ensure we just have the ID
-    accountID = this.fluro.utils.getStringID(accountID)
+    accountID = this.core.utils.getStringID(accountID)
     if (!options) {
       options = {}
     }
@@ -269,10 +272,10 @@ export default class FluroAuth {
     if (options.disableAutoAuthenticate) {
       autoAuthenticate = false
     }
-    const promise = this.fluro.api.post(`/token/account/${accountID}`)
+    const promise = this.core.api.post(`/token/account/${accountID}`)
     promise.then((res) => {
       if (autoAuthenticate) {
-        this.fluro.cache.reset()
+        this.core.cache.reset()
         this.set(res.data)
       }
     }, noop)
@@ -287,15 +290,15 @@ export default class FluroAuth {
    * @param  {Object} options
    * @return {Promise} Resolves to the user session object, or rejects with the responding error
    * @example
-   * this.fluro.auth.impersonate('5be504eabf33991239599d63')
+   * this.core.auth.impersonate('5be504eabf33991239599d63')
    * .then(function(userSession) {
    *     // New user session will be set automatically
-   *     let newUserSession = this.fluro.auth.getCurrentUser();
+   *     let newUserSession = this.core.auth.getCurrentUser();
    * })
    */
   impersonate(personaID, options) {
     // Ensure we just have the ID
-    personaID = this.fluro.utils.getStringID(personaID)
+    personaID = this.core.utils.getStringID(personaID)
     if (!options) {
       options = {}
     }
@@ -304,10 +307,10 @@ export default class FluroAuth {
     if (options.disableAutoAuthenticate) {
       autoAuthenticate = false
     }
-    const promise = this.fluro.api.post(`/token/persona/${personaID}`)
+    const promise = this.core.api.post(`/token/persona/${personaID}`)
     promise.then((res) => {
       if (autoAuthenticate) {
-        this.fluro.cache.reset()
+        this.core.cache.reset()
         this.set(res.data)
       }
     }, noop)
@@ -334,47 +337,39 @@ export default class FluroAuth {
     if (options.disableAutoAuthenticate) {
       autoAuthenticate = false
     }
-    const promise = new Promise(loginCheck)
-    function loginCheck(resolve, reject) {
+    const promise = new Promise((resolve, reject) => {
       if (!credentials) {
-        return reject({
-          message: 'Missing credentials!'
-        })
+        return reject(new Error('Missing credentials!'))
       }
       if (!credentials.username || !credentials.username.length) {
-        return reject({
-          message: 'Username was not provided'
-        })
+        return reject(new Error('Username was not provided'))
       }
       if (!credentials.password || !credentials.password.length) {
-        return reject({
-          message: 'Password was not provided'
-        })
+        return reject(new Error('Password was not provided'))
       }
 
       const postOptions = {
         bypassInterceptor: true
-      }
+      } as unknown as AxiosRequestConfig
 
-      let url = this.fluro.apiURL + '/token/login'
+      let url = this.core.apiURL + '/token/login'
 
       // If we are authenticating as an application
       if (options.application) {
         // The url is relative to the domain
-        url = `${this.fluro.domain || ''}/fluro/application/login`
+        url = `${this.core.domain || ''}/fluro/application/login`
       }
 
       // If we are logging in to a managed account use a different endpoint
       if (options.managedAccount) {
-        url =
-          this.fluro.apiURL + '/managed/' + options.managedAccount + '/login'
+        url = this.core.apiURL + '/managed/' + options.managedAccount + '/login'
       }
       // If we have a specified url
       if (options.url) {
         url = options.url
       }
 
-      this.fluro.api.post(url, credentials, postOptions).then((res) => {
+      this.core.api.post(url, credentials, postOptions).then((res) => {
         if (autoAuthenticate) {
           this.store.user = res.data
           this.dispatch()
@@ -384,7 +379,7 @@ export default class FluroAuth {
         }
         resolve(res)
       }, reject)
-    }
+    })
     return promise
   }
 
@@ -413,68 +408,53 @@ export default class FluroAuth {
     if (options.disableAutoAuthenticate) {
       autoAuthenticate = false
     }
-    const promise = new Promise(signupCheck)
-    function signupCheck(resolve, reject) {
+    const promise = new Promise((resolve, reject) => {
       if (!credentials) {
-        return reject({
-          message: 'No details provided'
-        })
+        return reject(new Error('No details provided'))
       }
       if (!credentials.firstName || !credentials.firstName.length) {
-        return reject({
-          message: 'First Name was not provided'
-        })
+        return reject(new Error('First Name was not provided'))
       }
       if (!credentials.lastName || !credentials.lastName.length) {
-        return reject({
-          message: 'Last Name was not provided'
-        })
+        return reject(new Error('Last Name was not provided'))
       }
       if (!credentials.username || !credentials.username.length) {
-        return reject({
-          message: 'Email/Username was not provided'
-        })
+        return reject(new Error('Email/Username was not provided'))
       }
       if (!credentials.password || !credentials.password.length) {
-        return reject({
-          message: 'Password was not provided'
-        })
+        return reject(new Error('Password was not provided'))
       }
       if (!credentials.confirmPassword || !credentials.confirmPassword.length) {
-        return reject({
-          message: 'Confirm Password was not provided'
-        })
+        return reject(new Error('Confirm Password was not provided'))
       }
       if (credentials.confirmPassword !== credentials.password) {
-        return reject({
-          message: 'Your passwords do not match'
-        })
+        return reject(new Error('Your passwords do not match'))
       }
 
       const postOptions = {
         bypassInterceptor: true
-      }
+      } as unknown as AxiosRequestConfig
 
-      let url = this.fluro.apiURL + '/user/signup'
+      let url = this.core.apiURL + '/user/signup'
 
       // If we are authenticating as an application
       if (options.application) {
         // The url is relative to the domain
-        url = `${this.fluro.domain || ''}/fluro/application/signup`
+        url = `${this.core.domain || ''}/fluro/application/signup`
       }
       // If we have a specified url
       if (options.url) {
         url = options.url
       }
 
-      this.fluro.api.post(url, credentials, postOptions).then((res) => {
+      this.core.api.post(url, credentials, postOptions).then((res) => {
         if (autoAuthenticate) {
           this.store.user = res.data
           this.dispatch()
         }
         resolve(res)
       }, reject)
-    }
+    })
     return promise
   }
 
@@ -494,23 +474,23 @@ export default class FluroAuth {
     return new Promise((resolve, reject) => {
       const postOptions = {
         bypassInterceptor: true
-      }
+      } as unknown as AxiosRequestConfig
 
       // If a full fledged Fluro User
       // then send directly to the API auth endpoint
-      let url = `${this.fluro.apiURL}/auth/token/${token}`
+      let url = `${this.core.apiURL}/auth/token/${token}`
 
       // If we are authenticating as an application
       if (options.application) {
         // The url is relative to the domain
-        url = `${this.fluro.domain || ''}/fluro/application/reset/${token}`
+        url = `${this.core.domain || ''}/fluro/application/reset/${token}`
       }
       // If we have a specified url
       if (options.url) {
         url = options.url
       }
 
-      this.fluro.api.get(url, postOptions).then((res) => {
+      this.core.api.get(url, postOptions).then((res) => {
         return resolve(res.data)
       }, reject)
     })
@@ -536,28 +516,28 @@ export default class FluroAuth {
     return new Promise((resolve, reject) => {
       const postOptions = {
         bypassInterceptor: true
-      }
+      } as unknown as AxiosRequestConfig
 
       // If a full fledged Fluro User
       // then send directly to the API auth endpoint
-      let url = `${this.fluro.apiURL}/auth/token/${token}`
+      let url = `${this.core.apiURL}/auth/token/${token}`
 
       // If we are authenticating as an application
       if (options.application) {
         // The url is relative to the domain
-        url = `${this.fluro.domain || ''}/fluro/application/reset/${token}`
+        url = `${this.core.domain || ''}/fluro/application/reset/${token}`
       }
       // If we have a specified url
       if (options.url) {
         url = options.url
       }
 
-      this.fluro.api.post(url, body, postOptions).then((res) => {
+      this.core.api.post(url, body, postOptions).then((res) => {
         // If we should automatically authenticate
         // once the request is successful
         // Then clear caches and update the session
         if (autoAuthenticate) {
-          this.fluro.cache.reset()
+          this.core.cache.reset()
           this.set(res.data)
         }
         return resolve(res.data)
@@ -582,41 +562,36 @@ export default class FluroAuth {
     if (!options) {
       options = {}
     }
-    const promise = new Promise(signupCheck)
-    function signupCheck(resolve, reject) {
+    const promise = new Promise((resolve, reject) => {
       if (!body) {
-        return reject({
-          message: 'No details provided'
-        })
+        return reject(new Error('No details provided'))
       }
       if (!body.username || !body.username.length) {
-        return reject({
-          message: 'Email/Username was not provided'
-        })
+        return reject(new Error('Email/Username was not provided'))
       }
       // Set username as the email address
       body.email = body.username
 
       const postOptions = {
         bypassInterceptor: true
-      }
+      } as unknown as AxiosRequestConfig
 
       // If a full fledged Fluro User
       // then send directly to the API
-      let url = this.fluro.apiURL + '/auth/resend'
+      let url = this.core.apiURL + '/auth/resend'
 
       // If we are authenticating as an application
       if (options.application) {
         // The url is relative to the domain
-        url = `${this.fluro.domain || ''}/fluro/application/forgot`
+        url = `${this.core.domain || ''}/fluro/application/forgot`
       }
       // If we have a specified url
       if (options.url) {
         url = options.url
       }
 
-      this.fluro.api.post(url, body, postOptions).then(resolve, reject)
-    }
+      this.core.api.post(url, body, postOptions).then(resolve, reject)
+    })
     return promise
   }
 
@@ -638,17 +613,17 @@ export default class FluroAuth {
     //     console.log('refresh token in normal context')
     // }
     // If there is already a request in progress
-    if (refreshContext.inflightRefreshRequest !== null) {
-      this.log(`this.fluro.auth > use inflight request`)
+    if (refreshContext.inflightRefreshRequest != null) {
+      this.log(`this.core.auth > use inflight request`)
       return refreshContext.inflightRefreshRequest
     }
     // Create an refresh request
-    this.log(`this.fluro.auth > refresh token new request`)
+    this.log(`this.core.auth > refresh token new request`)
     refreshContext.inflightRefreshRequest = new Promise((resolve, reject) => {
-      this.log(`this.fluro.auth > refresh token ${refreshToken}`)
+      this.log(`this.core.auth > refresh token ${refreshToken}`)
       // Bypass the interceptor on all token refresh calls
       // Because we don't need to add the access token etc onto it
-      this.fluro.api
+      this.core.api
         .post(
           '/token/refresh',
           {
@@ -658,22 +633,22 @@ export default class FluroAuth {
           {
             bypassInterceptor: true,
             application: appContext
-          }
+          } as unknown as AxiosRequestConfig
         )
-        .then(function tokenRefreshComplete(res) {
+        .then((res) => {
           // Update the user with any changes
           // returned back from the refresh request
           if (!res) {
-            this.log('this.fluro.auth > no res')
-            refreshContext.inflightRefreshRequest = null
-            return reject(new Error('this.fluro.auth > no res'))
+            this.log('this.core.auth > no res')
+            refreshContext.inflightRefreshRequest = undefined
+            return reject(new Error('this.core.auth > no res'))
           } else {
-            if (this.fluro.GLOBAL_AUTH || appContext) {
-              if (this.fluro.app) {
-                if (this.fluro.app.user) {
-                  assign(this.fluro.app.user, res.data)
+            if (this.core.GLOBAL_AUTH || appContext) {
+              if (this.core.app) {
+                if (this.core.app.user) {
+                  assign(this.core.app.user, res.data)
                 } else {
-                  this.fluro.app.user = res.data
+                  this.core.app.user = res.data
                 }
               }
             } else {
@@ -683,7 +658,7 @@ export default class FluroAuth {
                 this.store.user = res.data
               }
             }
-            this.log(`this.fluro.auth > token refreshed > ${res.data}`)
+            this.log(`this.core.auth > token refreshed > ${res.data}`)
             // if (this.onChange) {
             //     this.onChange(store.user);
             // }
@@ -694,13 +669,13 @@ export default class FluroAuth {
           resolve(res.data.token)
           // Remove the inflight request
           setTimeout(() => {
-            refreshContext.inflightRefreshRequest = null
+            refreshContext.inflightRefreshRequest = undefined
           })
         })
         .catch((err) => {
           console.log('TOKEN REFRESH FAILED', err)
           setTimeout(() => {
-            refreshContext.inflightRefreshRequest = null
+            refreshContext.inflightRefreshRequest = undefined
           })
           reject(err)
         })
@@ -718,17 +693,20 @@ export default class FluroAuth {
    */
 
   sync() {
-    return this.fluro.api
+    return this.core.api
       .get('/session')
       .then((res) => {
         if (res.data) {
           // Update the user with any changes
           // returned back from the refresh request
-          if (this.fluro.GLOBAL_AUTH) {
-            if (this.fluro.app.user) {
-              this.fluro.app.user = Object.assign(this.fluro.app.user, res.data)
+          if (this.core.GLOBAL_AUTH) {
+            if (this.core.app) {
+              this.core.app.user = Object.assign(
+                this.core.app.user ?? {},
+                res.data
+              )
             } else {
-              this.fluro.app.user = res.data
+              this.store.user = res.data
             }
           } else {
             if (this.store.user) {
@@ -736,21 +714,21 @@ export default class FluroAuth {
             }
           }
         } else {
-          if (this.fluro.GLOBAL_AUTH) {
-            this.fluro.app.user = null
+          if (this.core.GLOBAL_AUTH && this.core.app) {
+            this.core.app.user = null
           } else {
             this.store.user = null
           }
         }
-        this.log('this.fluro.auth > server session refreshed')
+        this.log('this.core.auth > server session refreshed')
         this.retryCount = 0
         this.dispatch()
       })
       .catch(() => {
         // if (retryCount > 2) {
         console.log('auth sync not logged in')
-        if (this.fluro.GLOBAL_AUTH) {
-          this.fluro.app.user = null
+        if (this.core.GLOBAL_AUTH && this.core.app) {
+          this.core.app.user = null
         } else {
           this.store.user = null
         }
@@ -770,7 +748,7 @@ export default class FluroAuth {
    */
   getCurrentToken() {
     const currentUser = this.getCurrentUser() || {}
-    return currentUser.token || this.fluro.applicationToken
+    return currentUser.token || this.core.applicationToken
   }
 
   /**
@@ -779,9 +757,7 @@ export default class FluroAuth {
    * @return {Object} The current user session
    */
   getCurrentUser() {
-    return this.fluro.GLOBAL_AUTH
-      ? this.fluro.app.user
-      : get(this.store, 'user')
+    return this.core.GLOBAL_AUTH ? this.core.app?.user : get(this.store, 'user')
   }
 
   public addEventListener: FluroDispatcher['addEventListener']

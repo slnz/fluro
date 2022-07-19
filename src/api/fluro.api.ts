@@ -3,13 +3,15 @@ import { isBrowser } from 'browser-or-node'
 import { intersection, get, isString, uniq, compact } from 'lodash'
 import qs from 'qs'
 
+import type FluroCore from './fluro.core'
+
 /**
  * Creates a new FluroAPI instance.
  * This module is a wrapper around the
  * <a href="https://www.npmjs.com/package/axios">axios</a> package. It aims to
  * make it easier for you to connect with and consume endpoints from the Fluro
  * REST API for more information about the available endpoints see
- * <a href="https://developer.this.fluro.io">Fluro REST API Documentation</a>
+ * <a href="https://developer.this.core.io">Fluro REST API Documentation</a>
  * @alias api
  * @constructor
  * @param {FluroCore} fluro A reference to the parent instance of the FluroCore
@@ -21,7 +23,7 @@ export default class FluroAPI {
   defaultAdapter = axios.defaults.adapter
   CancelToken = axios.CancelToken
 
-  constructor(private fluro) {
+  constructor(private core: FluroCore, _appContext?: boolean) {
     // // Cache Defaults
     // let FIVEINUTES = 1000 * 60 * 5;
     // let CAPACITY = 100;
@@ -32,7 +34,7 @@ export default class FluroAPI {
      * @access private
      */
     if (isBrowser) {
-      this.defaultCache = this.fluro.cache.get('api')
+      this.defaultCache = this.core.cache.get('api')
     }
 
     const newAxios = this.createNewAxios(this.cacheAdapter)
@@ -40,6 +42,7 @@ export default class FluroAPI {
     this.post = newAxios.post
     this.put = newAxios.put
     this.delete = newAxios.delete
+    this.interceptors = newAxios.interceptors
   }
 
   // Add our own adapter to the service
@@ -110,9 +113,8 @@ export default class FluroAPI {
       // )
     })
 
-    instance.defaults.baseURL = this.fluro.apiURL
+    instance.defaults.baseURL = this.core.apiURL
     instance.defaults.headers.common.Accept = 'application/json'
-    instance.defaults.withCredentials = this.fluro.withCredentials
     // Add relative date and timezone to every request
     instance.interceptors.request.use(
       (
@@ -121,36 +123,36 @@ export default class FluroAPI {
           disableUserContext?: boolean
         }
       ) => {
-        config.headers['this.fluro-request-date'] = new Date().getTime()
-        if (this.fluro.date.defaultTimezone) {
-          config.headers['this.fluro-request-timezone'] =
-            this.fluro.date.defaultTimezone
+        config.headers['fluro-request-date'] = new Date().getTime()
+        if (this.core.date.defaultTimezone) {
+          config.headers['fluro-request-timezone'] =
+            this.core.date.defaultTimezone
         }
-        config.headers['this.fluro-api-version'] = '2.2.30'
+        config.headers['fluro-api-version'] = '2.2.30'
 
         // We aren't using the user context by default
-        if (!this.fluro.userContextByDefault) {
+        if (!this.core.userContextByDefault) {
           // It's just a normal request and we haven't specified an application
           if (!config.application || config.disableUserContext) {
             return config
           }
         }
-        if (!this.fluro.app) {
+        if (!this.core.app) {
           return config
         }
 
-        if (this.fluro.app.uuid) {
-          config.headers['this.fluro-app-uuid'] = this.fluro.app.uuid
+        if (this.core.app.uuid) {
+          config.headers['fluro-app-uuid'] = this.core.app.uuid
           console.log('request uuid')
         }
 
         // There's no app or app user defined anyway
-        if (!this.fluro.app.user) {
+        if (!this.core.app.user) {
           return config
         }
 
-        console.log('Request as user', this.fluro.app.user.firstName)
-        config.headers.Authorization = `Bearer ${this.fluro.app.user.token}`
+        console.log('Request as user', this.core.app.user.firstName)
+        config.headers.Authorization = `Bearer ${this.core.app.user.token}`
         if (config.params && config.params.accessoken) {
           delete config.params.accessoken
         }
@@ -205,9 +207,9 @@ export default class FluroAPI {
         // Check the status
         switch (status) {
           case 401:
-            // Ignore and allow this.fluro.auth to handle it
-            if (this.fluro.app && this.fluro.app.user) {
-              this.fluro.app.user = null
+            // Ignore and allow this.core.auth to handle it
+            if (this.core.app?.user) {
+              this.core.app.user = null
             }
             break
           case 502:
@@ -216,13 +218,13 @@ export default class FluroAPI {
           case 504:
             // Retry
             // Try it again
-            console.log(`this.fluro.api > ${status} connection error retrying`)
+            console.log(`this.core.api > ${status} connection error retrying`)
             return instance.request(err.config)
           case 404:
             break
           default:
             // Some other error
-            console.log('this.fluro.api > connection error', status, err)
+            console.log('this.core.api > connection error', status, err)
             break
         }
         return Promise.reject(err)
@@ -312,6 +314,8 @@ export default class FluroAPI {
    */
   public delete: AxiosInstance['delete']
 
+  public interceptors: AxiosInstance['interceptors']
+
   /**
    * A helper function for generating an authenticated url for the current user
    * @param  {string} endpoint The id of the asset, or the asset object you want
@@ -320,7 +324,7 @@ export default class FluroAPI {
    * @param  {object} params
    * @return {string}          A full URL with relevant parameters included
    * @example
-   * // returns 'https://api.this.fluro.io/something?accessoken=2352345...'
+   * // returns 'https://api.this.core.io/something?accessoken=2352345...'
    fluro.api.generateEndpointURL('/something');
    */
   generateEndpointURL(path, params) {
@@ -330,12 +334,12 @@ export default class FluroAPI {
     if (!params) {
       params = {}
     }
-    let url = `${this.fluro.apiURL}${path}`
+    let url = `${this.core.apiURL}${path}`
 
     url = this.parameterDefaults(url, params)
 
     // Map the parameters to a query string
-    const queryParameters = this.fluro.utils.mapParameters(params)
+    const queryParameters = this.core.utils.mapParameters(params)
     if (queryParameters.length) {
       url += '?' + queryParameters
     }
@@ -346,7 +350,7 @@ export default class FluroAPI {
     // If we haven't requested without token
     if (!params.withoutToken) {
       // Get the current token from FluroAuth
-      const CurrentFluroToken = this.fluro.auth.getCurrentToken()
+      const CurrentFluroToken = this.core.auth.getCurrentToken()
       // Check to see if we have a token and none has been explicity set
       if (!params.accessoken && CurrentFluroToken) {
         // Use the current token by default
@@ -354,8 +358,8 @@ export default class FluroAPI {
       }
     }
 
-    if (this.fluro.app && this.fluro.app.uuid) {
-      params.did = this.fluro.app.uuid
+    if (this.core.app && this.core.app.uuid) {
+      params.did = this.core.app.uuid
     }
     return url
   }
@@ -380,7 +384,7 @@ export default class FluroAPI {
       config.method,
       config.url,
       JSON.stringify({ params: config.params, data: config.data }),
-      this.fluro.app && this.fluro.app.user ? this.fluro.app.user.persona : '',
+      this.core.app && this.core.app.user ? this.core.app.user.persona : '',
       config.application ? 'application' : '',
       config.disableUserContext ? 'disableUserContext' : ''
     ]).join('-')

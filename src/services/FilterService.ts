@@ -613,7 +613,17 @@ function dateCompare(input, range, type, format, timezone) {
   return matched
 }
 
-const comparators = []
+interface Comparator {
+  title: string
+  operator: string
+  match: (...args) => boolean | undefined
+  restrict?: string[]
+  dateDisplayFormat?: string
+  inputType?: string
+  positive?: boolean
+}
+
+const comparators: Comparator[] = []
 
 // Date Comparators
 comparators.push({
@@ -2613,7 +2623,7 @@ export function allKeys(initFields, config) {
         const flattened = getFlattenedFields(detailSheet.fields, [], [])
 
         const mapped = chain(flattened)
-          .map(function (field) {
+          .map((field) => {
             if (field.type === 'group') {
               return undefined
             }

@@ -1,5 +1,6 @@
 import { get } from 'lodash'
 
+import type FluroCore from './fluro.core'
 import FluroDispatcher from './fluro.dispatcher'
 
 // This is the bucket for each kind of stat
@@ -9,7 +10,7 @@ export default class FluroStatsUserStorage {
   inProgress = {}
   inflightRequest
   constructor(
-    private Fluro,
+    private core: FluroCore,
     private statName,
     private unique,
     private onChange?
@@ -64,17 +65,17 @@ export default class FluroStatsUserStorage {
   }
 
   isStatted(id) {
-    id = this.Fluro.utils.getStringID(id)
+    id = this.core.utils.getStringID(id)
     return get(this.store, `ids['${id}']`)
   }
 
   isStatting(id) {
-    id = this.Fluro.utils.getStringID(id)
+    id = this.core.utils.getStringID(id)
     return this.inProgress[id]
   }
 
   toggle(id) {
-    id = this.Fluro.utils.getStringID(id)
+    id = this.core.utils.getStringID(id)
     if (!this.unique) {
       throw Error(`Can't use the toggle() method on a non-this.unique stat`)
     }
@@ -88,7 +89,7 @@ export default class FluroStatsUserStorage {
 
   // Set the value and dispatch an event that we are processing
   setProcessing(id, isProcessing) {
-    id = this.Fluro.utils.getStringID(id)
+    id = this.core.utils.getStringID(id)
     this.inProgress[id] = isProcessing
     this.dispatcher.dispatch('statting', { id, statting: isProcessing })
   }
@@ -97,11 +98,11 @@ export default class FluroStatsUserStorage {
     if (this.unique) {
       throw Error(`Can't use the add() method on a non-this.unique stat`)
     }
-    id = this.Fluro.utils.getStringID(id)
-    const url = `${this.Fluro.apiURL}/stat/${id}/${this.statName}`
-    // console.log('delete stat', url, this.Fluro.app);
+    id = this.core.utils.getStringID(id)
+    const url = `${this.core.apiURL}/stat/${id}/${this.statName}`
+    // console.log('delete stat', url, this.core.app);
 
-    const promise = this.Fluro.api.delete(url, { cache: false })
+    const promise = this.core.api.delete(url, { cache: false })
     this.setProcessing(id, true)
 
     promise.then(
@@ -124,13 +125,13 @@ export default class FluroStatsUserStorage {
     if (!this.unique) {
       throw Error(`Can't use the unset() method on a non-this.unique stat`)
     }
-    // id = this.Fluro.utils.getStringID(id);
+    // id = this.core.utils.getStringID(id);
     // let url = `/stat/${id}/${this.statName}?this.unique=true`;
-    id = this.Fluro.utils.getStringID(id)
-    const url = `${this.Fluro.apiURL}/stat/${id}/${this.statName}?this.unique=true`
-    // console.log('unset stat', url, this.Fluro.app);
+    id = this.core.utils.getStringID(id)
+    const url = `${this.core.apiURL}/stat/${id}/${this.statName}?this.unique=true`
+    // console.log('unset stat', url, this.core.app);
 
-    const promise = this.Fluro.api.delete(url, { cache: false })
+    const promise = this.core.api.delete(url, { cache: false })
     this.setProcessing(id, true)
 
     promise.then(
@@ -151,13 +152,13 @@ export default class FluroStatsUserStorage {
     if (!this.unique) {
       throw Error(`Can't use the set() method on a non-this.unique stat`)
     }
-    // id = this.Fluro.utils.getStringID(id);
+    // id = this.core.utils.getStringID(id);
     // let url = `/stat/${id}/${this.statName}?this.unique=true`;
-    id = this.Fluro.utils.getStringID(id)
-    const url = `${this.Fluro.apiURL}/stat/${id}/${this.statName}?this.unique=true`
+    id = this.core.utils.getStringID(id)
+    const url = `${this.core.apiURL}/stat/${id}/${this.statName}?this.unique=true`
     // console.log('set stat', url);
 
-    const promise = this.Fluro.api.post(url, { cache: false })
+    const promise = this.core.api.post(url, { cache: false })
     this.setProcessing(id, true)
     promise.then(
       () => {
@@ -181,21 +182,21 @@ export default class FluroStatsUserStorage {
     return promise
   }
 
-  refresh() {
+  refresh(): Promise<unknown> {
     if (this.inflightRequest) {
       return this.inflightRequest
     }
-    let url = `${this.Fluro.apiURL}/stat/my/${this.statName}`
+    let url = `${this.core.apiURL}/stat/my/${this.statName}`
     // console.log('refresh stat', this.statName, url);
     if (this.unique) {
       url += '?this.unique=true'
     }
-    let promise
+    let promise: Promise<unknown>
     // If we are not logged in
-    const loggedInUser = this.Fluro.auth.getCurrentUser()
+    const loggedInUser = this.core.auth.getCurrentUser()
     // if (loggedInUser) {
-    if (loggedInUser || this.Fluro.applicationToken) {
-      promise = this.Fluro.api.get(url, { cache: false })
+    if (loggedInUser || this.core.applicationToken) {
+      promise = this.core.api.get(url, { cache: false })
     } else {
       promise = new Promise((resolve) => {
         return resolve([])

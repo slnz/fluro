@@ -1,109 +1,126 @@
-import _ from 'lodash'
+import { get, map, slice } from 'lodash'
 
+import type FluroCore from '../api/fluro.core'
 import FluroDispatcher from '../api/fluro.dispatcher'
 
-const FluroContentListService = (typeName, fluro, options) => {
-  if (!options) {
-    options = {}
+export default class FluroContentListService {
+  _type
+  _criteria
+  _pageIndex
+  _perPage
+  _loadingFilter = false
+  _loadingPage = false
+  _fields
+  _items = []
+  _page = []
+  _cacheKey
+  _pages = []
+  _cumulative
+  listCache
+  pageCache
+  cumulativeCache
+  dispatcher: FluroDispatcher
+
+  constructor(typeName, private core: FluroCore, options) {
+    if (!options) {
+      options = {}
+    }
+
+    if (!options.pageIndex) {
+      options.pageIndex = 0
+    }
+    if (!options.perPage) {
+      options.perPage = 25
+    }
+
+    this._type = typeName
+    this._criteria = options.criteria || {}
+    this._pageIndex = Math.max(options.pageIndex, 0)
+    this._perPage = Math.min(options.perPage, 200)
+    this._fields = options.fields || []
+    this._cacheKey = options.cacheKey
+    this._cumulative = options.cumulative
+    // // Default all definitions to true
+    // let _allDefinitions = options.allDefinitions === false ? false : true;
+
+    // Create a new this.dispatcher
+    this.dispatcher = new FluroDispatcher()
+    this.dispatcher.bootstrap(this)
+
+    // Get our list cache
+    this.listCache = this.core.cache.get('listcache')
+    this.pageCache = this.core.cache.get('pagecache')
+    this.cumulativeCache = this.core.cache.get(`cumulativecache`)
+
+    this.reloadCurrentPage()
   }
 
-  if (!options.pageIndex) {
-    options.pageIndex = 0
-  }
-  if (!options.perPage) {
-    options.perPage = 25
-  }
-
-  let _type = typeName
-  let _criteria = options.criteria || {}
-  let _pageIndex = Math.max(options.pageIndex, 0)
-  let _perPage = Math.min(options.perPage, 200)
-  let _loadingFilter = false
-  let _loadingPage = false
-  let _fields = options.fields || []
-  let _items = []
-  let _page = []
-  let _cacheKey = options.cacheKey
-  const _pages = []
-  let _cumulative = options.cumulative
-  // // Default all definitions to true
-  // let _allDefinitions = options.allDefinitions === false ? false : true;
-
-  const service = {}
-
-  // Create a new dispatcher
-  const dispatcher = new FluroDispatcher()
-  dispatcher.bootstrap(service)
-
-  // Get our list cache
-  const listCache = fluro.cache.get('listcache')
-  const pageCache = fluro.cache.get('pagecache')
-  const cumulativeCache = fluro.cache.get(`cumulativecache`)
-
-  service.filter = () => {
-    // /console.log('REFILTER', _cacheKey)
-    _loadingFilter = true
+  filter() {
+    // /console.log('REFILTER', this._cacheKey)
+    this._loadingFilter = true
     return new Promise((resolve, reject) => {
       // Generate a unique cache key for this function call
-      const cacheString = `${_type}-${JSON.stringify(_criteria)}-${
-        _cacheKey || 'none'
+      const cacheString = `${this._type}-${JSON.stringify(this._criteria)}-${
+        this._cacheKey || 'none'
       }`
-      const cachedFilterResults = listCache.get(cacheString)
+      const cachedFilterResults = this.listCache.get(cacheString)
       if (cachedFilterResults) {
-        _items = cachedFilterResults
-        dispatcher.dispatch('items', _items)
+        this._items = cachedFilterResults
+        this.dispatcher.dispatch('items', this._items)
 
         resolve(cachedFilterResults)
-        _loadingFilter = false
+        this._loadingFilter = false
       } else {
-        fluro.content
-          .filter(_type, _criteria)
+        this.core.content
+          .filter(this._type, this._criteria)
           .then((filtered) => {
-            _items = filtered
-            dispatcher.dispatch('items', _items)
+            this._items = filtered
+            this.dispatcher.dispatch('items', this._items)
             // Save our results to the cache
             const cachedFilterResults = filtered
-            listCache.set(cacheString, cachedFilterResults)
+            this.listCache.set(cacheString, cachedFilterResults)
             // Populate the pageIndex items
             resolve(cachedFilterResults)
-            _loadingFilter = false
-            dispatcher.dispatch('loadingFilter', _loadingFilter)
+            this._loadingFilter = false
+            this.dispatcher.dispatch('loadingFilter', this._loadingFilter)
           })
           .catch((err) => {
             reject(err)
-            _loadingFilter = false
-            dispatcher.dispatch('loadingFilter', _loadingFilter)
-            dispatcher.dispatch('error', err)
+            this._loadingFilter = false
+            this.dispatcher.dispatch('loadingFilter', this._loadingFilter)
+            this.dispatcher.dispatch('error', err)
           })
       }
     })
   }
 
-  service.reloadCurrentPage = () => {
+  reloadCurrentPage() {
     // /console.log('reload current page')
-    const start = Math.floor(_perPage * _pageIndex)
-    const end = start + _perPage
+    const start = Math.floor(this._perPage * this._pageIndex)
+    const end = start + this._perPage
 
-    const itemCachePrefix = `${_fields.join(',')}-${_cacheKey || 'none'}`
+    const itemCachePrefix = `${this._fields.join(',')}-${
+      this._cacheKey || 'none'
+    }`
 
-    _loadingPage = true
+    this._loadingPage = true
     return new Promise((resolve, reject) => {
-      service.filter().then((filtered) => {
-        const startingIndex = _cumulative ? 0 : start
+      this.filter().then((filtered) => {
+        const startingIndex = this._cumulative ? 0 : start
         console.log('cumulative test', startingIndex, start, end)
-        const listItems = filtered.slice(startingIndex, end)
+        const listItems = slice(filtered, startingIndex, end)
         // Create a fast hash
         const pageItemLookup = listItems.reduce((set, item) => {
           set[item._id] = item
           return set
         }, {})
         // Find the IDs we need to load
-        let ids = []
-        if (_cumulative) {
+        let ids: string[] = []
+        if (this._cumulative) {
           // Only load the items that we need to
-          const cachedItems = _.map(listItems, (item) => {
+          const cachedItems = map(listItems, (item) => {
             const itemCacheKey = `${itemCachePrefix}-${item._id}`
-            const cachedItem = cumulativeCache.get(itemCacheKey)
+            const cachedItem = this.cumulativeCache.get(itemCacheKey)
             if (!cachedItem) {
               ids.push(item._id)
             }
@@ -114,32 +131,31 @@ const FluroContentListService = (typeName, fluro, options) => {
             // Skip ahead because we don't need to load them from the server
             console.log('Page complete empty ids')
             return pageComplete(cachedItems)
-          } else {
           }
         } else {
-          ids = fluro.utils.arrayIDs(listItems)
+          ids = this.core.utils.arrayIDs(listItems)
         }
-        dispatcher.dispatch('totalPages', service.totalPages)
+        this.dispatcher.dispatch('totalPages', this.totalPages)
         // Get our page cache
-        const pageCacheKey = `${_cumulative}-${ids.join(',')}-${_fields.join(
+        const pageCacheKey = `${this._cumulative}-${ids.join(
           ','
-        )}-${_cacheKey || 'none'}`
-        const cachedPageResults = pageCache.get(pageCacheKey)
+        )}-${this._fields.join(',')}-${this._cacheKey || 'none'}`
+        const cachedPageResults = this.pageCache.get(pageCacheKey)
         // If we already have this page cached
         if (cachedPageResults) {
           // Skip ahead
           return pageComplete(cachedPageResults)
         }
         // Make a request to the server to load the bits we need
-        return fluro.content
-          .getMultiple(_type, ids, {
-            select: _fields
+        return this.core.content
+          .getMultiple(this._type, ids, {
+            select: this._fields
           })
           .then(multipleResultsLoaded)
           .catch((err) => {
             reject(err)
-            _loadingPage = false
-            dispatcher.dispatch('loadingPage', _loadingPage)
+            this._loadingPage = false
+            this.dispatcher.dispatch('loadingPage', this._loadingPage)
           })
         function multipleResultsLoaded(pageItems) {
           console.log('Multiple Results loaded', ids, pageItems)
@@ -148,12 +164,12 @@ const FluroContentListService = (typeName, fluro, options) => {
             return set
           }, {})
           // If we have loaded some items
-          if (_cumulative) {
+          if (this._cumulative) {
             // We need to compile the items we already cached mixed with the results
             // we just loaded from the server
             const combinedCacheItems = listItems.map((item) => {
               const itemCacheKey = `${itemCachePrefix}-${item._id}`
-              const cachedEntry = cumulativeCache.get(itemCacheKey)
+              const cachedEntry = this.cumulativeCache.get(itemCacheKey)
               if (cachedEntry) {
                 return cachedEntry
               } else {
@@ -172,195 +188,183 @@ const FluroContentListService = (typeName, fluro, options) => {
             const augmented = Object.assign({}, pageItemLookup[item._id], item)
             // Store in cache for later
             const itemCacheKey = `${itemCachePrefix}-${item._id}`
-            if (!cumulativeCache.get(itemCacheKey)) {
-              cumulativeCache.set(itemCacheKey, augmented)
+            if (!this.cumulativeCache.get(itemCacheKey)) {
+              this.cumulativeCache.set(itemCacheKey, augmented)
             }
             return augmented
           })
           console.log(
             'PAGE COMPLETE - First',
-            _.get(pageItems, '[0].title'),
+            get(pageItems, '[0].title'),
             '-',
-            _.get(items, '[0].title')
+            get(items, '[0].title')
           ) // , items)
 
           // Save the page to our cache
-          pageCache.set(pageCacheKey, items)
+          this.pageCache.set(this.pageCacheKey, items)
           // Save our results to the cache
-          _page = items
+          this._page = items
           resolve(items)
-          _loadingPage = false
-          dispatcher.dispatch('loadingPage', _loadingPage)
-          dispatcher.dispatch('page', _page)
+          this._loadingPage = false
+          this.dispatcher.dispatch('loadingPage', this._loadingPage)
+          this.dispatcher.dispatch('page', this._page)
         }
       })
     })
   }
-  service.nextPage = () => {
-    service.pageIndex++
-  }
-  service.previousPage = () => {
-    service.pageIndex--
-  }
-  //   // Object.defineProperty(service, "nextPageEnabled", {
-  //     get() {
-  //         return service.pageIndex < Math.ceil(_items.length / _perPage) - 1;
-  //     }
-  // });
-  // Object.defineProperty(service, "previousPageEnabled", {
-  //     get() {
-  //         return service.pageIndex > 0;
-  //     }
-  // });
-  Object.defineProperty(service, 'loading', {
-    get() {
-      return _loadingFilter || _loadingPage
-    }
-  })
-  Object.defineProperty(service, 'perPage', {
-    get() {
-      return _perPage
-    },
-    set(i) {
-      if (!i) {
-        i = 25
-      }
-      i = Math.min(i, 200)
-      i = Math.max(i, 0)
-      // If there is no change
-      if (_perPage === i) {
-        return
-      }
-      _perPage = i
-      // Reset the page in case we are too far ahead
-      service.pageIndex = 0 // service.pageIndex;
-      dispatcher.dispatch('perPage', _perPage)
-      dispatcher.dispatch('totalPages', service.totalPages)
 
-      service.reloadCurrentPage()
-    }
-  })
-  Object.defineProperty(service, 'cacheKey', {
-    get() {
-      return _cacheKey
-    },
-    set(c) {
-      // If there is no change
-      if (_cacheKey === c) {
-        return
-      }
-      _cacheKey = c
-      // /console.log('CACHE KEY HAS CHANGED')
-      service.reloadCurrentPage()
-    }
-  })
-  Object.defineProperty(service, 'pageIndex', {
-    get() {
-      return _pageIndex
-    },
-    set(i) {
-      const previousIndex = _pageIndex
-      if (!i) {
-        i = 0
-      }
-      const maxPages = Math.ceil(_items.length / _perPage)
-      i = Math.min(i, maxPages - 1)
-      i = Math.max(i, 0)
-      // If there is no change
-      if (_pageIndex === i) {
-        return
-      }
-      _pageIndex = i
-      dispatcher.dispatch('pageIndex', _pageIndex)
-      service.reloadCurrentPage()
-    }
-  })
-  Object.defineProperty(service, 'items', {
-    get() {
-      return _items
-    }
-  })
-  Object.defineProperty(service, 'page', {
-    get() {
-      return _page
-    }
-  })
-  Object.defineProperty(service, 'totalPages', {
-    get() {
-      return Math.ceil(_items.length / _perPage)
-    }
-  })
-  Object.defineProperty(service, 'total', {
-    get() {
-      return _items.length
-    }
-  })
-  Object.defineProperty(service, 'criteria', {
-    get() {
-      return _criteria
-    },
-    set(obj) {
-      // If there is no change
-      if (JSON.stringify(_criteria) === JSON.stringify(obj)) {
-        return
-      }
-      _criteria = obj
-      // /console.log('criteria changed');
-      service.reloadCurrentPage()
-    }
-  })
-  Object.defineProperty(service, 'fields', {
-    get() {
-      return _fields
-    },
-    set(array) {
-      // If there is no change
-      if (JSON.stringify(_fields) === JSON.stringify(array)) {
-        return
-      }
-      _fields = array
-      // /console.log('fields changed');
-      service.reloadCurrentPage()
-    }
-  })
-  // Object.defineProperty(service, "allDefinitions", {
-  //     get() {
-  //         return _allDefinitions;
-  //     },
-  //     set(boolean) {
+  nextPage() {
+    this.pageIndex++
+  }
 
-  //         _allDefinitions = boolean;
-  //         // /console.log('fields changed');
-  //         service.reloadCurrentPage();
-  //     }
-  // });
-  Object.defineProperty(service, 'type', {
-    get() {
-      return _type
-    },
-    set(type) {
-      // If there is no change
-      if (_type === type) {
-        return
-      }
-      _type = type
-      service.reloadCurrentPage()
+  previousPage() {
+    this.pageIndex--
+  }
+
+  get loading() {
+    return this._loadingFilter || this._loadingPage
+  }
+
+  get perPage() {
+    return this._perPage
+  }
+
+  set perPage(i) {
+    if (!i) {
+      i = 25
     }
-  })
-  Object.defineProperty(service, 'cumulative', {
-    get() {
-      return _cumulative
-    },
-    set(cumulative) {
-      // If there is no change
-      if (_cumulative === cumulative) {
-        return
-      }
-      _cumulative = cumulative
-      service.reloadCurrentPage()
+    i = Math.min(i, 200)
+    i = Math.max(i, 0)
+    // If there is no change
+    if (this._perPage === i) {
+      return
     }
-  })
-  service.reloadCurrentPage()
-  return service
+    this._perPage = i
+    // Reset the page in case we are too far ahead
+    this.pageIndex = 0 // this.pageIndex;
+    this.dispatcher.dispatch('perPage', this._perPage)
+    this.dispatcher.dispatch('totalPages', this.totalPages)
+
+    this.reloadCurrentPage()
+  }
+
+  get cacheKey() {
+    return this._cacheKey
+  }
+
+  set cacheKey(c) {
+    // If there is no change
+    if (this._cacheKey === c) {
+      return
+    }
+    this._cacheKey = c
+    // /console.log('CACHE KEY HAS CHANGED')
+    this.reloadCurrentPage()
+  }
+
+  get pageIndex() {
+    return this._pageIndex
+  }
+
+  set pageIndex(i) {
+    if (!i) {
+      i = 0
+    }
+    const maxPages = Math.ceil(this._items.length / this._perPage)
+    i = Math.min(i, maxPages - 1)
+    i = Math.max(i, 0)
+    // If there is no change
+    if (this._pageIndex === i) {
+      return
+    }
+    this._pageIndex = i
+    this.dispatcher.dispatch('pageIndex', this._pageIndex)
+    this.reloadCurrentPage()
+  }
+
+  get items() {
+    return this._items
+  }
+
+  get page() {
+    return this._page
+  }
+
+  get totalPages() {
+    return Math.ceil(this._items.length / this._perPage)
+  }
+
+  get total() {
+    return this._items.length
+  }
+
+  get criteria() {
+    return this._criteria
+  }
+
+  set criteria(obj) {
+    // If there is no change
+    if (JSON.stringify(this._criteria) === JSON.stringify(obj)) {
+      return
+    }
+    this._criteria = obj
+    // /console.log('criteria changed');
+    this.reloadCurrentPage()
+  }
+
+  get fields() {
+    return this._fields
+  }
+
+  set fields(array) {
+    // If there is no change
+    if (JSON.stringify(this._fields) === JSON.stringify(array)) {
+      return
+    }
+    this._fields = array
+    // /console.log('fields changed');
+    this.reloadCurrentPage()
+  }
+
+  // get allDefinitions() {
+  //   return this._allDefinitions
+  // }
+
+  // set allDefinitions(boolean) {
+  //   this._allDefinitions = boolean
+  //   this.reloadCurrentPage()
+  // }
+  get type() {
+    return this._type
+  }
+
+  set type(type) {
+    // If there is no change
+    if (this._type === type) {
+      return
+    }
+    this._type = type
+    this.reloadCurrentPage()
+  }
+
+  get cumulative() {
+    return this._cumulative
+  }
+
+  set cumulative(cumulative) {
+    // If there is no change
+    if (this._cumulative === cumulative) {
+      return
+    }
+    this._cumulative = cumulative
+    this.reloadCurrentPage()
+  }
+
+  // get nextPageEnabled() {
+  //   return this.pageIndex < Math.ceil(this._items.length / this._perPage) - 1
+  // }
+
+  // get previousPageEnabled() {
+  //   return this.pageIndex > 0
+  // }
 }
-export default FluroContentListService

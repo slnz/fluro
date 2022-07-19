@@ -1,5 +1,6 @@
 import { chain, some, includes, map, intersection, reduce } from 'lodash'
 
+import type FluroCore from './fluro.core'
 import FluroDispatcher from './fluro.dispatcher'
 /**
  * Creates a new FluroAccess service
@@ -16,10 +17,9 @@ import FluroDispatcher from './fluro.dispatcher'
 export default class FluroAccess {
   store: { application?: { session?: object } } = {}
   dispatcher: FluroDispatcher
-  glossary = {}
 
-  constructor(private FluroCore) {
-    if (!this.FluroCore.auth) {
+  constructor(private core: FluroCore) {
+    if (!this.core.auth) {
       throw new Error(
         `Can't Instantiate FluroAccess before FluroAccess has been initialized`
       )
@@ -47,7 +47,7 @@ export default class FluroAccess {
     this.dispatcher.dispatch('application', application)
   }
 
-  isFluroAdmin(webMode?): boolean {
+  isFluroAdmin(webMode?) {
     const user = this.retrieveCurrentSession(webMode)
     // If we are not authenticated as a user
     if (!user) {
@@ -73,13 +73,13 @@ export default class FluroAccess {
    */
   retrieveCurrentSession(webMode?) {
     let user
-    if (this.FluroCore.GLOBAL_AUTH) {
-      user = this.FluroCore.auth.getCurrentUser()
+    if (this.core.GLOBAL_AUTH) {
+      user = this.core.auth.getCurrentUser()
     } else {
-      if (webMode || this.FluroCore.userContextByDefault) {
-        user = this.FluroCore.app ? this.FluroCore.app.user : null
+      if (webMode || this.core.userContextByDefault) {
+        user = this.core.app ? this.core.app.user : null
       } else {
-        user = this.FluroCore.auth.getCurrentUser()
+        user = this.core.auth.getCurrentUser()
       }
     }
 
@@ -115,7 +115,7 @@ export default class FluroAccess {
    * fluro.access.can('edit any' 'service', 'event');
    *
    */
-  can(action, type, parentType, webMode) {
+  can(action, type, parentType, webMode): boolean {
     // Get the current session
     const session = this.retrieveCurrentSession(webMode)
     // If we are not logged in and are not
@@ -296,13 +296,13 @@ export default class FluroAccess {
     if (canAccess) {
       return true
     }
-    if (this.FluroCore.types && this.FluroCore.types.glossary) {
-      const subTypes = some(this.glossary, (term, key) => {
-        if (term.parentType === type) {
-          return some(actionsToCheck, (action) => {
-            return this.can(action, key, null, webMode)
-          })
-        }
+    if (this.core.types && this.core.types.glossary) {
+      const subTypes = some(this.core.types.glossary, (term, key) => {
+        if (term.parentType !== type) return false
+
+        return some(actionsToCheck, (action) =>
+          this.can(action, key, null, webMode)
+        )
       })
       return subTypes
     }
@@ -421,8 +421,8 @@ export default class FluroAccess {
       return false
     }
 
-    const userID = this.FluroCore.utils.getStringID(user)
-    const authorID = this.FluroCore.utils.getStringID(item.author)
+    const userID = this.core.utils.getStringID(user)
+    const authorID = this.core.utils.getStringID(item.author)
     // The user is the author if the user's id matches
     // the content author's id
     let author = userID === authorID
@@ -433,8 +433,8 @@ export default class FluroAccess {
       return true
     }
     // Check if the persona matches the managed author
-    const personaID = this.FluroCore.utils.getStringID(user.persona)
-    const managedAuthorID = this.FluroCore.utils.getStringID(item.managedAuthor)
+    const personaID = this.core.utils.getStringID(user.persona)
+    const managedAuthorID = this.core.utils.getStringID(item.managedAuthor)
     // If the user's persona is the managed author of the content
     if (personaID === managedAuthorID) {
       author = true
@@ -447,7 +447,7 @@ export default class FluroAccess {
     }
 
     // Check if the item has any owners listed on it
-    const ownerIDs = this.FluroCore.utils.arrayIDs(item.owners)
+    const ownerIDs = this.core.utils.arrayIDs(item.owners)
     // If owners are listed
     if (ownerIDs && ownerIDs.length) {
       // Check if the user is listed as an owner
@@ -461,14 +461,14 @@ export default class FluroAccess {
     }
 
     // Check if the item has any managed owners listed on it
-    const managedOwnerIDs = this.FluroCore.utils.arrayIDs(item.managedOwners)
+    const managedOwnerIDs = this.core.utils.arrayIDs(item.managedOwners)
     // If managed owners are listed
     if (managedOwnerIDs && managedOwnerIDs.length) {
       // Check if the user is listed as an owner
       author = includes(managedOwnerIDs, personaID)
     }
 
-    const itemID = this.FluroCore.utils.getStringID(item)
+    const itemID = this.core.utils.getStringID(item)
     // If the user is trying to edit their own user
     if (userID === itemID) {
       author = true
@@ -500,12 +500,12 @@ export default class FluroAccess {
       return false
     }
     // Store the itemID in case we need to reference it below
-    const itemID = this.FluroCore.utils.getStringID(item)
+    const itemID = this.core.utils.getStringID(item)
 
     // Check the account of the user
     // and the account of the content
-    const userAccountID = this.FluroCore.utils.getStringID(user.account)
-    const contentAccountID = this.FluroCore.utils.getStringID(item.account)
+    const userAccountID = this.core.utils.getStringID(user.account)
+    const contentAccountID = this.core.utils.getStringID(item.account)
     // If there is an account listed on the content and it does not
     // match the account of the user then we can't edit it
     if (contentAccountID && contentAccountID !== userAccountID) {
@@ -537,7 +537,7 @@ export default class FluroAccess {
     if (item._type === 'process') {
       if (item.assignedTo && item.assignedTo.length) {
         const intersect = intersection(
-          this.FluroCore.utils.arrayIDs(item.assignedTo),
+          this.core.utils.arrayIDs(item.assignedTo),
           user.contacts
         )
         if (intersect && intersect.length) {
@@ -548,7 +548,7 @@ export default class FluroAccess {
         // Check if the user is in any of the teams
         const userTeams = map(user.visibleRealms, '_team')
         const intersect = intersection(
-          this.FluroCore.utils.arrayIDs(item.assignedToTeam),
+          this.core.utils.arrayIDs(item.assignedToTeam),
           userTeams
         )
         if (intersect && intersect.length) {
@@ -586,12 +586,12 @@ export default class FluroAccess {
     // instead of the 'item.realms' array
     if (definitionName === 'realm' || parentType === 'realm') {
       // Check the realm.trail
-      contentRealmIDs = this.FluroCore.utils.arrayIDs(item.trail)
+      contentRealmIDs = this.core.utils.arrayIDs(item.trail)
       // Include the realm itself
       contentRealmIDs.push(itemID)
     } else {
       // Retrieve all the realms the content is currently in
-      contentRealmIDs = this.FluroCore.utils.arrayIDs(item.realms)
+      contentRealmIDs = this.core.utils.arrayIDs(item.realms)
     }
 
     // Check if the user has any permissions on the parent type that will allow
@@ -669,7 +669,7 @@ export default class FluroAccess {
     }
 
     // Store the itemID in case we need to reference it below
-    const itemID = this.FluroCore.utils.getStringID(item)
+    const itemID = this.core.utils.getStringID(item)
 
     let definitionName = item._type
     let parentType
@@ -719,13 +719,13 @@ export default class FluroAccess {
     // instead of the 'item.realms' array
     if (definitionName === 'realm' || parentType === 'realm') {
       // Check the realm.trail
-      contentRealmIDs = this.FluroCore.utils.arrayIDs(item.trail)
+      contentRealmIDs = this.core.utils.arrayIDs(item.trail)
       // Include the realm itself
       console.log('PUSH?', contentRealmIDs)
       contentRealmIDs.push(itemID)
     } else {
       // Retrieve all the realms the content is currently in
-      contentRealmIDs = this.FluroCore.utils.arrayIDs(item.realms)
+      contentRealmIDs = this.core.utils.arrayIDs(item.realms)
     }
 
     // Check if the user has any permissions on the parent type that will allow
@@ -804,12 +804,12 @@ export default class FluroAccess {
       return false
     }
     // Store the itemID in case we need to reference it below
-    const itemID = this.FluroCore.utils.getStringID(item)
+    const itemID = this.core.utils.getStringID(item)
 
     // Check the account of the user
     // and the account of the content
-    const userAccountID = this.FluroCore.utils.getStringID(user.account)
-    const contentAccountID = this.FluroCore.utils.getStringID(item.account)
+    const userAccountID = this.core.utils.getStringID(user.account)
+    const contentAccountID = this.core.utils.getStringID(item.account)
     // If there is an account listed on the content and it does not
     // match the account of the user then we can't delete it
     if (contentAccountID && contentAccountID !== userAccountID) {
@@ -867,12 +867,12 @@ export default class FluroAccess {
     // instead of the 'item.realms' array
     if (definitionName === 'realm' || parentType === 'realm') {
       // Check the realm.trail
-      contentRealmIDs = this.FluroCore.utils.arrayIDs(item.trail)
+      contentRealmIDs = this.core.utils.arrayIDs(item.trail)
       // Include the realm itself
       contentRealmIDs.push(itemID)
     } else {
       // Retrieve all the realms the content is currently in
-      contentRealmIDs = this.FluroCore.utils.arrayIDs(item.realms)
+      contentRealmIDs = this.core.utils.arrayIDs(item.realms)
     }
 
     // Check if the user has any permissions on the parent type that will allow
@@ -933,7 +933,7 @@ export default class FluroAccess {
     }
     return new Promise((resolve, reject) => {
       // Retrieve all the realms the user is allowed to know about
-      this.FluroCore.api
+      this.core.api
         .get('/realm/selectable', {
           params
         })
@@ -947,7 +947,7 @@ export default class FluroAccess {
     return new Promise((resolve, reject) => {
       // Load the glossary
       console.log('Reload terminology for permissions')
-      this.FluroCore.types
+      this.core.types
         .reloadTerminology(options)
         .then((terms) => {
           const derivatives = reduce(
