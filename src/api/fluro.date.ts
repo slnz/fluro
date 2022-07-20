@@ -494,7 +494,8 @@ export function timeline(items, dateKey, chronological) {
         let dayKey
         let monthKey
         let yearKey
-        const specifiedTimezone = options.timezone || entry.timezone
+        const specifiedTimezone =
+          (options as unknown as { timezone }).timezone || entry.timezone
         if (
           specifiedTimezone &&
           isDifferentTimezoneThanUser(specifiedTimezone)

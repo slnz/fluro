@@ -1,3 +1,4 @@
+import strtotime from 'locutus/php/datetime/strtotime'
 import {
   each,
   chain,
@@ -16,11 +17,10 @@ import {
   values
 } from 'lodash'
 import moment from 'moment-timezone'
-import stringSimilarity from 'string-similarity'
+import { compareTwoStrings } from 'string-similarity'
 
 import { getFlattenedFields } from '../api/fluro.utils'
 
-let chrono //= require('chrono-node');
 let verboseDEBUG
 
 export function activeFilters(config) {
@@ -388,10 +388,7 @@ export function isSimilar(input, mustMatchValue, options?) {
     options = {}
   }
 
-  const score = stringSimilarity.compareTwoStrings(
-    getString(input),
-    getString(mustMatchValue)
-  )
+  const score = compareTwoStrings(getString(input), getString(mustMatchValue))
   const matches = score >= 0.6
 
   if (options.source) {
@@ -2198,12 +2195,6 @@ export function filterMatch(filter, filterOptions, item) {
         ? filterOptions.contextDate
         : new Date()
 
-      // if(startsWith(dynamicString.trim(), '-')) {
-      //     dynamicString = `${dynamicString} ago`;
-      // } else {
-      //     ////console.log('In future')
-      // }
-
       if (filterOptions.timezone) {
         const zone = moment.tz.zone(filterOptions.timezone)
         if (zone) {
@@ -2212,18 +2203,10 @@ export function filterMatch(filter, filterOptions, item) {
         }
       }
 
-      let timestamp
-
-      if (chrono) {
-        timestamp = chrono.parseDate(dynamicString, contextDateInput)
-      }
-
-      // If it failed then use strtotime
-      if (!timestamp) {
-        // Create a new date from the relative date
-
-        timestamp = new Date(contextDateInput).strtotime(dynamicString)
-      }
+      const timestamp = strtotime(
+        dynamicString,
+        new Date(contextDateInput).getTime()
+      )
 
       // Use the timestamp as the value we need to match
       mustMatchValue = new Date(timestamp)
@@ -2504,8 +2487,8 @@ export function allKeys(initFields, config) {
 
   const basicTypeName = get(config, 'type.definitionName')
 
-  const definitionFields = chain(config)
-    .get('definition.fields')
+  const definitionFieldsArray = get(config, 'definition.fields')
+  const definitionFields = chain(definitionFieldsArray)
     .map((field) => {
       if (basicTypeName === 'interaction') {
         return Object.assign({}, field, {
@@ -2522,23 +2505,23 @@ export function allKeys(initFields, config) {
   // console.log('Get all fields', definitionFields);
 
   // Include filters that have been set on the definition
-  const definitionFilters = chain(config)
-    .get('definition.filters')
+  const definitionFiltersArray = get(config, 'definition.filters')
+  const definitionFilters = chain(definitionFiltersArray)
     .map(function (field) {
       return Object.assign({}, field)
     })
     .value()
 
   // Include filters that have been set on the definition
-  const dynamicFilters = chain(config)
-    .get('definition.dynamicFilters')
+  const dynamicFiltersArray = get(config, 'definition.dynamicFilters')
+  const dynamicFilters = chain(dynamicFiltersArray)
     .map(function (field) {
       return Object.assign({}, field)
     })
     .value()
 
-  const typeFields = chain(config)
-    .get('type.fields')
+  const typeFieldsArray = get(config, 'type.fields')
+  const typeFields = chain(typeFieldsArray)
     .map(function (field) {
       return Object.assign({}, field)
     })
@@ -2675,7 +2658,7 @@ export function getDeepValue(set, node, keyPath) {
   // Matching Value
   const value = get(node, keyPath)
 
-  if (value === undefined || value === null || value === [] || value === '') {
+  if (value === undefined || value === null || isArray(value) || value === '') {
     return
   }
 

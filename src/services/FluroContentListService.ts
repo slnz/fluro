@@ -73,7 +73,7 @@ export default class FluroContentListService {
       } else {
         this.core.content
           .filter(this._type, this._criteria)
-          .then((filtered) => {
+          .then((filtered: Array<unknown>) => {
             this._items = filtered
             this.dispatcher.dispatch('items', this._items)
             // Save our results to the cache
@@ -105,14 +105,14 @@ export default class FluroContentListService {
 
     this._loadingPage = true
     return new Promise((resolve, reject) => {
-      this.filter().then((filtered) => {
+      this.filter().then((filtered: Array<unknown>) => {
         const startingIndex = this._cumulative ? 0 : start
         console.log('cumulative test', startingIndex, start, end)
         const listItems = slice(filtered, startingIndex, end)
         // Create a fast hash
         const pageItemLookup: Record<string, unknown> = reduce(
           listItems,
-          (set, item) => {
+          (set, item: { _id: string }) => {
             set[item._id] = item
             return set
           },
@@ -122,7 +122,7 @@ export default class FluroContentListService {
         let ids: string[] = []
         if (this._cumulative) {
           // Only load the items that we need to
-          const cachedItems = map(listItems, (item) => {
+          const cachedItems = map(listItems, (item: { _id: string }) => {
             const itemCacheKey = `${itemCachePrefix}-${item._id}`
             const cachedItem = this.cumulativeCache.get(itemCacheKey)
             if (!cachedItem) {
@@ -171,15 +171,17 @@ export default class FluroContentListService {
           if (this._cumulative) {
             // We need to compile the items we already cached mixed with the results
             // we just loaded from the server
-            const combinedCacheItems = listItems.map((item) => {
-              const itemCacheKey = `${itemCachePrefix}-${item._id}`
-              const cachedEntry = this.cumulativeCache.get(itemCacheKey)
-              if (cachedEntry) {
-                return cachedEntry
-              } else {
-                return lookup[item._id]
+            const combinedCacheItems = listItems.map(
+              (item: { _id: string }) => {
+                const itemCacheKey = `${itemCachePrefix}-${item._id}`
+                const cachedEntry = this.cumulativeCache.get(itemCacheKey)
+                if (cachedEntry) {
+                  return cachedEntry
+                } else {
+                  return lookup[item._id]
+                }
               }
-            })
+            )
             return pageComplete(combinedCacheItems)
           } else {
             return pageComplete(pageItems)

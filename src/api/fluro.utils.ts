@@ -1,5 +1,4 @@
 import axios from 'axios'
-import { isBrowser } from 'browser-or-node'
 import {
   chain,
   isArray,
@@ -462,7 +461,7 @@ export function comma(array, path, limit) {
 export function getStringID(
   input: string | { _id: unknown } | undefined
 ): string | undefined {
-  if (input == null) return input
+  if (input == null) return
 
   if (typeof input === 'object' && input._id) return String(input._id)
 
@@ -601,7 +600,7 @@ const injectedScripts = {}
  */
 export function injectScript(scriptURL) {
   return new Promise((resolve, reject) => {
-    if (!document) {
+    if (typeof document === 'undefined') {
       return reject(
         new Error(
           'Script injection can only be used when running in a browser context'
@@ -637,7 +636,7 @@ export function injectModule(scriptURL, options) {
     options = {}
   }
 
-  if (!document) {
+  if (typeof document === 'undefined') {
     return Promise.reject(
       new Error(
         'Script injection can only be used when running in a browser context'

@@ -22,7 +22,7 @@ export default class FluroAsset {
   }
 
   constructor(private core: FluroCore) {
-    if (window) {
+    if (typeof window !== 'undefined') {
       this.defaultWindowSettings = window
       this.isRetina = window.devicePixelRatio > 1
     }

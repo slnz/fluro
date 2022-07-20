@@ -239,7 +239,7 @@ export default class FluroTypes {
    * fluro.types.mapDefinitionItems([{title:'test', definition:'demographic'}], 'tag');
    *
    */
-  mapDefinitionItems(array: { definition?: string }[], backup) {
+  mapDefinitionItems(array, backup) {
     if (!array || !array.length) {
       return []
     }
@@ -260,7 +260,7 @@ export default class FluroTypes {
         return set
       }, {})
       .values()
-      .orderBy((type) => {
+      .orderBy((type: { key: string }) => {
         return type.key === backup
       })
       .value()

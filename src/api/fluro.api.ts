@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios'
 import { isBrowser } from 'browser-or-node'
 import { intersection, get, isString, uniq, compact } from 'lodash'
-import qs from 'qs'
+import { stringify } from 'qs'
 
 import type FluroCore from './fluro.core'
 
@@ -99,7 +99,7 @@ export default class FluroAPI {
   private createNewAxios(adapter) {
     const instance = axios.create({
       paramsSerializer: (params) =>
-        qs.stringify(params, { arrayFormat: 'repeat' }),
+        stringify(params, { arrayFormat: 'repeat' }),
       adapter
       // adapter: throttleAdapterEnhancer(
       //   cacheAdapterEnhancer(axios.defaults.adapter, {

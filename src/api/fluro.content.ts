@@ -899,7 +899,7 @@ export default class FluroContent {
     return new Promise((resolve, reject) => {
       // Load the proper thing
       this.get(itemID)
-        .then((populatedItem) => {
+        .then((populatedItem: { account }) => {
           const newItem = JSON.parse(JSON.stringify(populatedItem))
           // Remove the bits and pieces
           delete newItem._id
