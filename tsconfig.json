@@ -1,26 +1,9 @@
 {
+  "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
-    "module": "esnext",
-    "outDir": "dist/mjs",
-    "target": "esnext",
-    "allowJs": true,
-    "allowSyntheticDefaultImports": true,
-    "baseUrl": "src",
-    "declaration": true,
-    "esModuleInterop": true,
-    "inlineSourceMap": false,
     "lib": ["esnext", "dom"],
-    "listEmittedFiles": false,
-    "listFiles": false,
+    "target": "es5",
     "moduleResolution": "node",
-    "noFallthroughCasesInSwitch": true,
-    "pretty": true,
-    "resolveJsonModule": true,
-    "rootDir": "src",
-    "skipLibCheck": true,
-    "traceResolution": false
-  },
-  "compileOnSave": false,
-  "exclude": ["node_modules", "dist"],
-  "include": ["src"]
+    "allowSyntheticDefaultImports": true
+  }
 }
