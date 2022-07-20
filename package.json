@@ -1,5 +1,6 @@
 {
   "name": "@slnz/fluro",
+  "version": "0.0.2",
   "description": "Promise based HTTP Fluro client for the browser and node.js",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
